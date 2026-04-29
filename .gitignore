@@ -1,0 +1,6 @@
+.env
+coverage.out
+coverage.html
+bulwarkai
+floor-service
+site/public/

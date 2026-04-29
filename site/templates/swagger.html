@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}API Reference - {{ config.title }}{% endblock %}
+
+{% block content %}
+<div style="max-width:1120px;margin:0 auto;padding:6rem 1.5rem 4rem">
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: "/swagger.yaml",
+      dom_id: '#swagger-ui',
+      presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIBundle.SwaggerUIStandalonePreset
+      ],
+      layout: "BaseLayout"
+    })
+  </script>
+</div>
+{% endblock %}

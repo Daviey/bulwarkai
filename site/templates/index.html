@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+
+{% block title %}Bulwarkai{% endblock %}
+
+{% block content %}
+
+<section class="hero">
+  <div class="wrap">
+    <p class="overline">Open source AI safety proxy</p>
+    <h1>Your AI castle<br>has no moat.</h1>
+    <p class="lead">A bastion proxy that sits between your users and Vertex AI. It inspects every prompt and every response. Pluggable inspectors, zero vendor lock-in, no client changes required.</p>
+    <div class="cta-row">
+      <a class="btn gold" href="{{ config.extra.github }}">View on GitHub</a>
+      <a class="btn ghost" href="#deploy">Deploy in 30 seconds</a>
+    </div>
+    <p class="sub">// this project should not need to exist</p>
+  </div>
+</section>
+
+<nav class="section-nav" aria-label="Sections">
+  <a href="#breach" class="section-nav-dot" data-section="breach">
+    <span class="section-nav-label">The breach</span>
+    <span class="section-nav-pip"></span>
+  </a>
+  <a href="#garrison" class="section-nav-dot" data-section="garrison">
+    <span class="section-nav-label">The garrison</span>
+    <span class="section-nav-pip"></span>
+  </a>
+  <a href="#compat" class="section-nav-dot" data-section="compat">
+    <span class="section-nav-label">Compatibility</span>
+    <span class="section-nav-pip"></span>
+  </a>
+  <a href="#deploy" class="section-nav-dot" data-section="deploy">
+    <span class="section-nav-label">Deploy</span>
+    <span class="section-nav-pip"></span>
+  </a>
+  <a href="#docs" class="section-nav-dot" data-section="docs">
+    <span class="section-nav-label">Docs</span>
+    <span class="section-nav-pip"></span>
+  </a>
+</nav>
+
+<section class="strip">
+  <div class="wrap">
+    <p class="strip-label">Plugs into your existing Google Cloud stack</p>
+    <div class="strip-logos">
+      <div class="strip-item">
+        <img src="/icons/vertexai.png" width="24" height="24" alt="Vertex AI">
+        <span>Vertex AI</span>
+      </div>
+      <div class="strip-item">
+        <img src="/icons/modelarmor.png" width="24" height="24" alt="Model Armor">
+        <span>Model Armor</span>
+      </div>
+      <div class="strip-item">
+        <img src="/icons/dlp.png" width="24" height="24" alt="Cloud DLP">
+        <span>Cloud DLP</span>
+      </div>
+      <div class="strip-item">
+        <img src="/icons/go.png" width="24" height="24" alt="Go">
+        <span>Cloud Run</span>
+      </div>
+      <div class="strip-item">
+        <img src="/icons/googlecloud.png" width="24" height="24" alt="Google Cloud">
+        <span>IAM + ADC</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="breach">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="label">01</span>
+      <h2>The breach</h2>
+      <p>Your organisation opened Vertex AI to the team. Nobody is watching what goes in or comes out.</p>
+    </div>
+    <div class="breach-grid reveal">
+      <div class="breach-text">
+        <p><strong>Sensitive data leaves your network in plain text.</strong> An engineer pastes a stack trace containing your entire customer table. A support agent includes account numbers in a prompt. A developer copies a production private key into a code review request. All of it travels to Google's API unscreened.</p>
+        <p><strong>Responses come back unchecked.</strong> The model can generate social security numbers, credit card data, credentials, or harmful content. Without a proxy, that output goes straight to the user's screen with no filter, no warning, no record.</p>
+        <p><strong>Model Armor has documented gaps.</strong> It does not enforce on streaming endpoints. It only works with Gemini models, not third-party ones. It fails open when unavailable, passing unscreened traffic by design. Cloud DLP exists but nothing wires it into the request path.</p>
+        <p><strong>Library-based screening is a policy, not a control.</strong> If screening lives in application code, a misconfigured client bypasses it. If it is a shared library, a developer can skip the import. A network proxy enforces at the infrastructure layer. Clients cannot opt out.</p>
+      </div>
+      <div class="callout">
+        <h3>What happens without a proxy</h3>
+        <ul>
+          <li><span class="dot">&#9679;</span> Customer PII in Vertex AI audit logs, sent by an engineer who pasted a support ticket</li>
+          <li><span class="dot">&#9679;</span> Production private keys travelling to Google in plain text inside a prompt</li>
+          <li><span class="dot">&#9679;</span> AWS root credentials logged in Vertex AI request history</li>
+          <li><span class="dot">&#9679;</span> Streaming endpoints bypassing Model Armor entirely</li>
+          <li><span class="dot">&#9679;</span> Zero screening on third-party models (Anthropic, Llama) running in Vertex AI</li>
+          <li><span class="dot">&#9679;</span> Model Armor skipping sanitization when overloaded, passing traffic through</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="garrison" class="alt">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="label">02</span>
+      <h2>The garrison</h2>
+      <p>Bulwarkai is infrastructure, not a library. It runs between your users and Vertex AI. Every request passes through the inspector chain before reaching the model. Every response passes through before reaching the user. No client can skip it.</p>
+    </div>
+    <div class="inspectors reveal">
+      <div class="insp">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+        <h3>Regex</h3>
+        <p>SSNs, credit cards, private keys, AWS keys, API keys, credentials</p>
+        <div class="ms">~0ms, zero deps</div>
+      </div>
+      <div class="insp">
+        <div class="icon"><img src="/icons/modelarmor.png" width="22" height="22" alt="Model Armor"></div>
+        <h3>Model Armor</h3>
+        <p>Google Cloud semantic content analysis for policy violations</p>
+        <div class="ms">~200ms</div>
+        <div class="note">Optional. Replaceable.</div>
+      </div>
+      <div class="insp">
+        <div class="icon"><img src="/icons/dlp.png" width="22" height="22" alt="Cloud DLP"></div>
+        <h3>Cloud DLP</h3>
+        <p>Statistical PII detection with configurable info types</p>
+        <div class="ms">~300ms</div>
+        <div class="note">Optional. Replaceable.</div>
+      </div>
+    </div>
+    <div class="code-block reveal" style="margin-top:2rem">
+<pre><span class="comment">// Implement this interface to add your own inspector.</span>
+
+type <span class="key">Inspector</span> interface {
+    Name() string
+    InspectPrompt(ctx context.Context, prompt, token string) *BlockResult
+    InspectResponse(ctx context.Context, response, token string) *BlockResult
+}</pre>
+    </div>
+    <div class="modes reveal">
+      <div class="mode">
+        <span class="tag strict">default</span>
+        <h3>Strict</h3>
+        <p>Prompt and response screened synchronously. Non-streaming so Model Armor enforcement works end to end.</p>
+        <table>
+          <tr><th>Prompt</th><td class="yes">screened</td></tr>
+          <tr><th>Response</th><td class="yes">screened</td></tr>
+          <tr><th>Streaming</th><td class="no">simulated</td></tr>
+          <tr><th>Model Armor</th><td class="yes">enforced</td></tr>
+        </table>
+      </div>
+      <div class="mode">
+        <span class="tag fast">low latency</span>
+        <h3>Fast</h3>
+        <p>Real streaming. Prompt only. Use when latency matters more than response screening.</p>
+        <table>
+          <tr><th>Prompt</th><td class="yes">screened</td></tr>
+          <tr><th>Response</th><td class="no">no</td></tr>
+          <tr><th>Streaming</th><td class="yes">real</td></tr>
+          <tr><th>Model Armor</th><td class="no">no</td></tr>
+        </table>
+      </div>
+      <div class="mode">
+        <span class="tag audit">observability</span>
+        <h3>Audit</h3>
+        <p>Real streaming with post-response audit. Violations logged after the user sees the response.</p>
+        <table>
+          <tr><th>Prompt</th><td class="yes">screened</td></tr>
+          <tr><th>Response</th><td class="partial">post-hoc</td></tr>
+          <tr><th>Streaming</th><td class="yes">real</td></tr>
+          <tr><th>Model Armor</th><td class="no">no</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compat">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="label">03</span>
+      <h2>Drop-in compatibility</h2>
+      <p>Point your existing tools at Bulwarkai. Anthropic, OpenAI, and Vertex AI formats all work. No client changes needed.</p>
+    </div>
+    <div class="api-grid reveal">
+      <div class="api-card">
+        <div class="api-head">
+          <img src="/icons/anthropic.png" width="20" height="20" alt="Anthropic">
+          <code>POST /v1/messages</code>
+        </div>
+        <h3>Anthropic Messages</h3>
+        <p>Works with the Anthropic SDK and Claude Code. Set <code>base_url</code> to your proxy endpoint.</p>
+      </div>
+      <div class="api-card">
+        <div class="api-head">
+          <img src="/icons/openai.png" width="20" height="20" alt="OpenAI">
+          <code>POST /v1/chat/completions</code>
+        </div>
+        <h3>OpenAI Chat Completions</h3>
+        <p>Works with the OpenAI SDK and any tool that speaks the OpenAI format.</p>
+      </div>
+      <div class="api-card">
+        <div class="api-head">
+          <img src="/icons/vertexai.png" width="20" height="20" alt="Vertex AI">
+          <code>/models/{model}:generateContent</code>
+        </div>
+        <h3>Vertex AI native</h3>
+        <p>Pass-through for Gemini native format. Streaming and non-streaming.</p>
+      </div>
+      <div class="api-card">
+        <div class="api-head">
+          <img src="/icons/googlecloud.png" width="20" height="20" alt="Google Cloud">
+          <code>GET /v1/models</code>
+        </div>
+        <h3>Model discovery</h3>
+        <p>Returns available models in OpenAI format so SDKs can enumerate them.</p>
+      </div>
+    </div>
+    <p style="margin-top:1rem" class="reveal"><a href="/swagger/">Full API reference</a></p>
+  </div>
+</section>
+
+<section id="deploy" class="alt">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="label">04</span>
+      <h2>Deploy in 30 seconds</h2>
+      <p>Demo mode runs the full screening pipeline with canned responses. No GCP account, no Vertex AI, no cost.</p>
+    </div>
+    <div class="code-block reveal">
+<pre><span class="comment"># Clone and run</span>
+git clone https://github.com/Daviey/bulwarkai.git
+cd bulwarkai
+DEMO_MODE=true LOCAL_MODE=true go run .
+
+<span class="comment"># In another terminal, send a test prompt with a fake SSN</span>
+curl -s http://localhost:8080/v1/chat/completions \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"model":"gemini-2.5-flash","messages":[
+    {"role":"user","content":"BULWARKAI-TEST-SSN-000-00-0000"}
+  ]}'</span>
+
+<span class="comment"># {"error":{"message":"Blocked by bulwarkai: SSN detected",...}}</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="label">05</span>
+      <h2>Documentation</h2>
+    </div>
+    <div class="docs-grid reveal">
+      <a href="/docs/design/" class="doc-card"><h3>Design and Architecture</h3><p>Mermaid diagrams, request flow, threat model, and design decisions.</p></a>
+      <a href="/docs/deployment/" class="doc-card"><h3>Deployment</h3><p>Cloud Run, Docker, Terraform, rollback procedures.</p></a>
+      <a href="/docs/configuration/" class="doc-card"><h3>Configuration</h3><p>Every environment variable documented.</p></a>
+      <a href="/docs/inspectors/" class="doc-card"><h3>Inspectors</h3><p>Inspector interface, backends, and tuning.</p></a>
+      <a href="/docs/operations/" class="doc-card"><h3>Operations</h3><p>Monitoring, alerting, metrics, troubleshooting.</p></a>
+      <a href="/docs/client-config/" class="doc-card"><h3>Client Configuration</h3><p>Tool setup, geographic restrictions, CVE guidance.</p></a>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

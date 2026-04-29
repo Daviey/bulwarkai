@@ -1,0 +1,14 @@
+# Required - set these to your own values
+project_id              = "your-project-id"
+allowed_domains         = "yourcompany.com"
+allowed_iam_members     = ["user:alice@yourcompany.com"]
+
+# Optional - defaults shown
+# region                = "europe-west2"
+# response_mode         = "strict"
+# fallback_model        = "gemini-2.5-flash"
+# model_armor_template  = "test-template"
+# api_keys              = ""
+# user_agent_regex      = ""
+# dlp_enabled           = false
+# dlp_info_types        = "US_SOCIAL_SECURITY_NUMBER,CREDIT_CARD_NUMBER,EMAIL_ADDRESS,PHONE_NUMBER"

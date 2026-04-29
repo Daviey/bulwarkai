@@ -1,0 +1,3 @@
+# BULWARKAI-TEST-AWS-AKIA0000000000000000 in internal/inspector/regex.go
+# is an EICAR-style test string for the regex inspector, not a real credential.
+aws-access-key-id

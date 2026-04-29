@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page.title }} - {{ config.title }}{% endblock %}
+
+{% block content %}
+<div class="docs-layout">
+  <aside class="sidebar">
+    <h4>Documentation</h4>
+    <ul>
+      <li><a href="/docs/design/" {% if page.relative_path == "docs/design.md" %}class="active"{% endif %}>Design and Architecture</a></li>
+      <li><a href="/docs/deployment/" {% if page.relative_path == "docs/deployment.md" %}class="active"{% endif %}>Deployment</a></li>
+      <li><a href="/docs/configuration/" {% if page.relative_path == "docs/configuration.md" %}class="active"{% endif %}>Configuration</a></li>
+      <li><a href="/docs/inspectors/" {% if page.relative_path == "docs/inspectors.md" %}class="active"{% endif %}>Inspectors</a></li>
+      <li><a href="/docs/operations/" {% if page.relative_path == "docs/operations.md" %}class="active"{% endif %}>Operations</a></li>
+      <li><a href="/docs/client-config/" {% if page.relative_path == "docs/client-config.md" %}class="active"{% endif %}>Client Configuration</a></li>
+    </ul>
+    <h4>ADRs</h4>
+    <ul>
+      <li><a href="/docs/adr/001-why-go/">001: Why Go</a></li>
+      <li><a href="/docs/adr/002-why-proxy/">002: Why Proxy</a></li>
+      <li><a href="/docs/adr/003-why-three-formats/">003: Why Three Formats</a></li>
+      <li><a href="/docs/adr/004-why-fail-open/">004: Why Fail Open</a></li>
+      <li><a href="/docs/adr/005-why-user-tokens/">005: Why User Tokens</a></li>
+      <li><a href="/docs/adr/006-why-scratch/">006: Why From Scratch</a></li>
+      <li><a href="/docs/adr/007-mode-naming/">007: Mode Naming</a></li>
+      <li><a href="/docs/adr/008-eicar-test-strings/">008: EICAR Test Strings</a></li>
+    </ul>
+  </aside>
+  <article class="doc-content">
+    {{ page.content | safe }}
+  </article>
+</div>
+{% endblock %}
