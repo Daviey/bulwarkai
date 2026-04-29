@@ -1,0 +1,236 @@
+info:
+  contact:
+    name: Dave Walker
+    url: https://github.com/Daviey/bulwarkai
+  description: |-
+    AI safety proxy that screens every request and response between client applications and Google Vertex AI.
+    Supports Anthropic Messages, OpenAI Chat Completions, and Vertex AI Gemini native formats.
+  license:
+    name: Apache-2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0
+  title: Bulwarkai Proxy Service
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Returns service status and current screening mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - Health
+  /models/{model}:{action}:
+    post:
+      consumes:
+      - application/json
+      description: Pass-through for Gemini native format requests (/models/{model}:generateContent
+        or :streamGenerateContent)
+      parameters:
+      - description: Model name
+        in: path
+        name: model
+        required: true
+        type: string
+      - description: Action (generateContent or streamGenerateContent)
+        in: path
+        name: action
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "502":
+          description: vertex ai error
+          schema:
+            type: string
+      summary: Vertex AI Gemini native format
+      tags:
+      - VertexAI
+  /ready:
+    get:
+      description: Checks if the service can reach Vertex AI
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: not ready
+          schema:
+            type: string
+      summary: Readiness check
+      tags:
+      - Health
+  /test-strings:
+    get:
+      description: Returns safe test strings that trigger each inspector for verification
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: EICAR-style test strings
+      tags:
+      - Health
+  /v1/chat/completions:
+    post:
+      consumes:
+      - application/json
+      description: Proxies OpenAI-format requests to Vertex AI Gemini, screening prompt
+        and response
+      parameters:
+      - description: OpenAI Chat Completions request
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: invalid json
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+      summary: OpenAI Chat Completions API
+      tags:
+      - OpenAI
+  /v1/messages:
+    post:
+      consumes:
+      - application/json
+      description: Proxies Anthropic-format requests to Vertex AI Gemini, screening
+        prompt and response
+      parameters:
+      - description: Anthropic Messages request
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: invalid json
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+      summary: Anthropic Messages API
+      tags:
+      - Anthropic
+  /v1/models:
+    get:
+      consumes:
+      - application/json
+      description: Returns models available through the proxy (OpenAI-compatible)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List available models
+      tags:
+      - OpenAI
+  /v1/models/{model}:
+    get:
+      consumes:
+      - application/json
+      description: Returns details for a specific model
+      parameters:
+      - description: Model ID
+        in: path
+        name: model
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: model not found
+          schema:
+            type: string
+      summary: Get model details
+      tags:
+      - OpenAI
+  /v1/projects/{project}/locations/{location}/models/{model}:{action}:
+    post:
+      consumes:
+      - application/json
+      description: Pass-through for full Vertex AI project path requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Vertex AI full project path
+      tags:
+      - VertexAI
+securityDefinitions:
+  ApiKey:
+    in: header
+    name: X-Api-Key
+    type: apiKey
+  BearerToken:
+    in: header
+    name: Authorization
+    type: apiKey
+  ForwardedAccessToken:
+    in: header
+    name: X-Forwarded-Access-Token
+    type: apiKey
+swagger: "2.0"

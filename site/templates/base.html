@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ config.title }}{% endblock %}</title>
+<link rel="icon" href="/logo-64.png" type="image/png">
+<link rel="stylesheet" href="/main.css">
+<meta name="description" content="{{ config.description }}">
+<meta property="og:image" content="/hero.png">
+<meta property="og:title" content="{{ config.title }}">
+<meta property="og:description" content="{{ config.description }}">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="inner">
+    <a href="/" class="brand">
+      <img src="/logo-128.png" alt="Bulwarkai">
+      Bulwarkai
+    </a>
+    <div class="links">
+      <a href="/#breach">Why</a>
+      <a href="/#garrison">How</a>
+      <a href="/#compat">API</a>
+      <a href="/docs/design/">Docs</a>
+      <a href="/swagger/">Reference</a>
+      <a href="{{ config.extra.github }}">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+{% block content %}{% endblock %}
+
+<hr class="gold-rule">
+
+<footer>
+  <div class="wrap">
+    <div class="footer-inner">
+      <p>Apache 2.0 licence. <a href="{{ config.extra.github }}">View on GitHub</a></p>
+      <p>This project should not need to exist.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('code[data-lang=mermaid]').forEach(function(code) {
+      var pre = code.parentElement;
+      pre.classList.add('mermaid');
+      pre.classList.remove('giallo');
+      pre.removeAttribute('style');
+      pre.textContent = code.textContent;
+    });
+  });
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    themeVariables: {
+      primaryColor: '#F5F0E8',
+      primaryTextColor: '#1C1915',
+      primaryBorderColor: 'rgba(139,105,20,0.18)',
+      lineColor: '#78716C',
+      secondaryColor: '#EDE7DB',
+      tertiaryColor: '#E8E1D2',
+      background: '#F5F0E8',
+      mainBkg: '#EDE7DB',
+      nodeBorder: '#8B6914',
+      clusterBkg: '#EDE7DB',
+      titleColor: '#1C1915',
+      edgeLabelBackground: '#F5F0E8'
+    }
+  });
+</script>
+
+<script>
+  var els = document.querySelectorAll('.reveal');
+  var obs = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  els.forEach(function(el) { obs.observe(el); });
+</script>
+
+<script>
+  (function() {
+    var nav = document.querySelector('.section-nav');
+    if (!nav) return;
+
+    var dots = nav.querySelectorAll('.section-nav-dot');
+    var sectionEls = [];
+    dots.forEach(function(dot) {
+      var id = dot.getAttribute('data-section');
+      var el = document.getElementById(id);
+      if (el) sectionEls.push({ dot: dot, el: el });
+    });
+
+    var navVisible = false;
+    var sectionObs = new IntersectionObserver(function(entries) {
+      if (!navVisible) {
+        navVisible = true;
+        nav.classList.add('visible');
+      }
+      entries.forEach(function(e) {
+        var match = sectionEls.find(function(s) { return s.el === e.target; });
+        if (match) {
+          if (e.isIntersecting) {
+            match.dot.classList.add('active');
+          } else {
+            match.dot.classList.remove('active');
+          }
+        }
+      });
+    }, { threshold: 0.3 });
+
+    sectionEls.forEach(function(s) { sectionObs.observe(s.el); });
+  })();
+</script>
+
+</body>
+</html>

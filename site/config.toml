@@ -1,0 +1,13 @@
+title = "Bulwarkai"
+description = "AI prompt and response screening proxy for Vertex AI"
+base_url = "https://bulwarkai.cloud"
+compile_sass = true
+minify_html = true
+
+[markdown]
+highlighting.theme = "github-dark"
+
+
+[extra]
+github = "https://github.com/Daviey/bulwarkai"
+version = "0.1.0"

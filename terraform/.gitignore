@@ -1,0 +1,21 @@
+# Terraform state bucket (create this before running terraform init)
+# gsutil mb -l europe-west2 gs://floor-service-tfstate
+
+# OS / editor noise
+.*.swp
+.*.swo
+*~
+.idea/
+.vscode/
+
+# Sensitive
+.terraform/
+terraform.tfstate
+terraform.tfstate.backup
+*.tfstate*
+terraform.tfvars
+*.tfplan
+
+# OS
+.DS_Store
+Thumbs.db
