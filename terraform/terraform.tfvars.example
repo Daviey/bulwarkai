@@ -24,3 +24,9 @@ allowed_iam_members     = ["user:alice@yourcompany.com"]
 # Webhook Notifications
 # webhook_url           = ""
 # webhook_secret        = ""
+
+# VPC Service Controls (optional - disabled by default)
+# Requires org-level Access Context Manager policy to exist.
+# vpc_sc_enabled        = false
+# access_policy_name    = ""  # Access Context Manager policy name
+# org_id                = ""  # GCP organization ID (number)
