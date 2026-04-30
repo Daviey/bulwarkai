@@ -28,6 +28,9 @@ type Config struct {
 	LogPromptMode       string
 	LogPromptLength     int
 	Version             string
+	OPAEnabled          bool
+	OPAPolicyFile       string
+	OPAPolicyURL        string
 }
 
 func Load() *Config {
@@ -49,6 +52,9 @@ func Load() *Config {
 		LogPromptLength:     32,
 		APIKeys:             MapKeys("API_KEYS"),
 		Version:             "dev",
+		OPAEnabled:          os.Getenv("OPA_ENABLED") == "true",
+		OPAPolicyFile:       EnvOr("OPA_POLICY_FILE", ""),
+		OPAPolicyURL:        EnvOr("OPA_POLICY_URL", ""),
 	}
 	c.ModelArmorEndpoint = "https://modelarmor." + c.ModelArmorLocation + ".rep.googleapis.com"
 	if ua := os.Getenv("USER_AGENT_REGEX"); ua != "" {
