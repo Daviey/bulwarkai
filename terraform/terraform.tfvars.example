@@ -12,3 +12,15 @@ allowed_iam_members     = ["user:alice@yourcompany.com"]
 # user_agent_regex      = ""
 # dlp_enabled           = false
 # dlp_info_types        = "US_SOCIAL_SECURITY_NUMBER,CREDIT_CARD_NUMBER,EMAIL_ADDRESS,PHONE_NUMBER"
+
+# OPA Policy Engine
+# opa_enabled           = false
+# opa_policy_content    = "package bulwarkai\ndefault allow := true\n"
+
+# Rate Limiting
+# rate_limit            = 0
+# rate_limit_window     = "1m"
+
+# Webhook Notifications
+# webhook_url           = ""
+# webhook_secret        = ""

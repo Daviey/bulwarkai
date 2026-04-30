@@ -85,13 +85,13 @@ func newTestServer(vertexTS *httptest.Server) *handler.Server {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, httpClient)
-	return handler.NewServer(testCfg, chain, vc, httpClient, nil)
+	return handler.NewServer(testCfg, chain, vc, httpClient, nil, nil)
 }
 
 func newCustomServer(cfg *config.Config, httpClient *http.Client) *handler.Server {
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(cfg, httpClient)
-	return handler.NewServer(cfg, chain, vc, httpClient, nil)
+	return handler.NewServer(cfg, chain, vc, httpClient, nil, nil)
 }
 
 func validAuthHeaders() http.Header {
@@ -2979,7 +2979,7 @@ func TestLocalModeAnthropicHandlerNoAuth(t *testing.T) {
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, vertexTS.Client())
 	vc.SetADCTokenFunc(func() string { return "adc-mock-token" })
-	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(
 		`{"model":"gemini-2.5-flash","max_tokens":4096,"messages":[{"role":"user","content":"hello"}]}`,
@@ -3020,7 +3020,7 @@ func TestLocalModeOpenAIHandlerNoAuth(t *testing.T) {
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, vertexTS.Client())
 	vc.SetADCTokenFunc(func() string { return "adc-mock-token" })
-	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(
 		`{"model":"gemini-2.5-flash","max_tokens":4096,"messages":[{"role":"user","content":"hello"}]}`,
@@ -3057,7 +3057,7 @@ func TestLocalModeBlocksSSN(t *testing.T) {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, http.DefaultClient)
-	srv := handler.NewServer(testCfg, chain, vc, http.DefaultClient, nil)
+	srv := handler.NewServer(testCfg, chain, vc, http.DefaultClient, nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(
 		`{"model":"gemini-2.5-flash","max_tokens":4096,"messages":[{"role":"user","content":"My SSN is 123-45-6789"}]}`,
@@ -3097,7 +3097,7 @@ func TestLocalModeUsesADCToken(t *testing.T) {
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, vertexTS.Client())
 	vc.SetADCTokenFunc(func() string { return "adc-token-12345" })
-	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(
 		`{"model":"gemini-2.5-flash","max_tokens":4096,"messages":[{"role":"user","content":"hello"}]}`,
@@ -3291,7 +3291,7 @@ func TestAuditResponseEmpty(t *testing.T) {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, vertexTS.Client())
-	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, vertexTS.Client(), nil, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(
@@ -3324,7 +3324,7 @@ func TestAuditResponseWithSSNInResponse(t *testing.T) {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, blockedTS.Client())
-	srv := handler.NewServer(testCfg, chain, vc, blockedTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, blockedTS.Client(), nil, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/v1/messages", strings.NewReader(
@@ -3358,7 +3358,7 @@ func TestOpenAIAuditResponseWithSSNInResponse(t *testing.T) {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	vc := vertex.NewClient(testCfg, blockedTS.Client())
-	srv := handler.NewServer(testCfg, chain, vc, blockedTS.Client(), nil)
+	srv := handler.NewServer(testCfg, chain, vc, blockedTS.Client(), nil, nil)
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(
@@ -3936,7 +3936,7 @@ func newDemoTestServer() *handler.Server {
 	}
 	chain := inspector.NewChain(inspector.NewRegexInspector())
 	demo := vertex.NewDemoClient(testCfg)
-	return handler.NewServer(testCfg, chain, demo, http.DefaultClient, nil)
+	return handler.NewServer(testCfg, chain, demo, http.DefaultClient, nil, nil)
 }
 
 func TestDemoModeAnthropicNonStreaming(t *testing.T) {

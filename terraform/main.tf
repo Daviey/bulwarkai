@@ -77,6 +77,43 @@ variable "allowed_iam_members" {
   default     = []
 }
 
+variable "opa_enabled" {
+  description = "Enable OPA policy engine"
+  type        = bool
+  default     = false
+}
+
+variable "opa_policy_content" {
+  description = "Inline Rego policy content. Used when opa_policy_gcs_path is empty."
+  type        = string
+  default     = ""
+}
+
+variable "rate_limit" {
+  description = "Per-user request limit per window. 0 disables rate limiting."
+  type        = number
+  default     = 0
+}
+
+variable "rate_limit_window" {
+  description = "Rate limit time window (Go duration: 30s, 1m, 5m, 1h)"
+  type        = string
+  default     = "1m"
+}
+
+variable "webhook_url" {
+  description = "URL for block event webhook notifications. Empty disables webhooks."
+  type        = string
+  default     = ""
+}
+
+variable "webhook_secret" {
+  description = "Secret token for webhook verification"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 locals {
   service_name = "bulwarkai"
   sa_name      = "bulwarkai"

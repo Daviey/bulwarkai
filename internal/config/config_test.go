@@ -228,3 +228,59 @@ func TestLoad_OPAEnabled(t *testing.T) {
 		t.Fatalf("got %q", cfg.OPAPolicyFile)
 	}
 }
+
+func TestLoad_RateLimit(t *testing.T) {
+	os.Setenv("RATE_LIMIT", "100")
+	os.Setenv("RATE_LIMIT_WINDOW", "5m")
+	defer os.Unsetenv("RATE_LIMIT")
+	defer os.Unsetenv("RATE_LIMIT_WINDOW")
+	cfg := Load()
+	if cfg.RateLimit != 100 {
+		t.Fatalf("got %d", cfg.RateLimit)
+	}
+	if cfg.RateLimitWindow != "5m" {
+		t.Fatalf("got %q", cfg.RateLimitWindow)
+	}
+}
+
+func TestLoad_RateLimitDefaults(t *testing.T) {
+	os.Unsetenv("RATE_LIMIT")
+	os.Unsetenv("RATE_LIMIT_WINDOW")
+	cfg := Load()
+	if cfg.RateLimit != 0 {
+		t.Fatalf("got %d", cfg.RateLimit)
+	}
+	if cfg.RateLimitWindow != "1m" {
+		t.Fatalf("got %q", cfg.RateLimitWindow)
+	}
+}
+
+func TestLoad_Webhook(t *testing.T) {
+	os.Setenv("WEBHOOK_URL", "https://hooks.example.com/block")
+	os.Setenv("WEBHOOK_SECRET", "s3cr3t")
+	defer os.Unsetenv("WEBHOOK_URL")
+	defer os.Unsetenv("WEBHOOK_SECRET")
+	cfg := Load()
+	if cfg.WebhookURL != "https://hooks.example.com/block" {
+		t.Fatalf("got %q", cfg.WebhookURL)
+	}
+	if cfg.WebhookSecret != "s3cr3t" {
+		t.Fatalf("got %q", cfg.WebhookSecret)
+	}
+}
+
+func TestEnvInt(t *testing.T) {
+	os.Setenv("TEST_ENVINT", "42")
+	defer os.Unsetenv("TEST_ENVINT")
+	if got := EnvInt("TEST_ENVINT", 0); got != 42 {
+		t.Fatalf("got %d", got)
+	}
+	if got := EnvInt("TEST_MISSING_XYZ", 99); got != 99 {
+		t.Fatalf("got %d", got)
+	}
+	os.Setenv("TEST_ENVINT_BAD", "notanumber")
+	defer os.Unsetenv("TEST_ENVINT_BAD")
+	if got := EnvInt("TEST_ENVINT_BAD", 7); got != 7 {
+		t.Fatalf("got %d", got)
+	}
+}

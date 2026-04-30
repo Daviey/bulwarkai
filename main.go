@@ -30,7 +30,9 @@ import (
 	"github.com/Daviey/bulwarkai/internal/handler"
 	"github.com/Daviey/bulwarkai/internal/inspector"
 	"github.com/Daviey/bulwarkai/internal/policy"
+	"github.com/Daviey/bulwarkai/internal/ratelimit"
 	"github.com/Daviey/bulwarkai/internal/vertex"
+	"github.com/Daviey/bulwarkai/internal/webhook"
 )
 
 var version = "dev"
@@ -63,13 +65,20 @@ func main() {
 
 	var policyEngine *policy.Engine
 	if cfg.OPAEnabled {
-		pe, err := policy.NewEngine(context.Background(), true, cfg.OPAPolicyFile, cfg.OPAPolicyURL)
+		pe, err := policy.NewEngineWithHTTP(context.Background(), true, cfg.OPAPolicyFile, cfg.OPAPolicyURL, httpClient)
 		if err != nil {
 			slog.Error("opa init failed", "error", err)
 			os.Exit(1)
 		}
 		policyEngine = pe
 		slog.Info("opa policy engine enabled")
+	}
+
+	var wh *webhook.Notifier
+	if cfg.WebhookURL != "" {
+		wh = webhook.NewNotifier(cfg.WebhookURL, cfg.WebhookSecret, 256)
+		wh.Start()
+		slog.Info("webhook notifier enabled", "url", cfg.WebhookURL)
 	}
 
 	var caller vertex.VertexCaller
@@ -79,7 +88,21 @@ func main() {
 	} else {
 		caller = vertex.NewClient(cfg, httpClient)
 	}
-	server := handler.NewServer(cfg, chain, caller, httpClient, policyEngine)
+	server := handler.NewServer(cfg, chain, caller, httpClient, policyEngine, wh)
+
+	var rateLimiter *ratelimit.Limiter
+	if cfg.RateLimit > 0 {
+		window := parseDuration(cfg.RateLimitWindow, time.Minute)
+		rateLimiter = ratelimit.NewLimiter(cfg.RateLimit, window)
+		slog.Info("rate limiting enabled", "limit", cfg.RateLimit, "window", cfg.RateLimitWindow)
+		go func() {
+			ticker := time.NewTicker(window)
+			defer ticker.Stop()
+			for range ticker.C {
+				rateLimiter.Cleanup()
+			}
+		}()
+	}
 
 	slog.Info("bulwarkai starting", "version", version, "mode", cfg.ResponseMode, "inspectors", chain.Names(), "template", cfg.ModelArmorTemplate, "model", cfg.FallbackGeminiModel, "local", cfg.LocalMode, "demo", cfg.DemoMode)
 
@@ -100,10 +123,27 @@ func main() {
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 	slog.Info("shutting down", "timeout", "30s")
+	if policyEngine != nil {
+		policyEngine.Stop()
+	}
+	if wh != nil {
+		wh.Stop()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("shutdown error", "error", err)
 	}
 	slog.Info("shutdown complete")
+}
+
+func parseDuration(s string, def time.Duration) time.Duration {
+	if s == "" {
+		return def
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return def
+	}
+	return d
 }

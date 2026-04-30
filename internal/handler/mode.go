@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Daviey/bulwarkai/internal/metrics"
+	"github.com/Daviey/bulwarkai/internal/webhook"
 )
 
 func (s *Server) auditResponse(ctx context.Context, text, token, model, email string) {
@@ -26,6 +27,15 @@ func (s *Server) logAction(action, model, prompt, reason, email string) {
 	level := slog.LevelInfo
 	if strings.HasPrefix(action, "BLOCK") || strings.HasPrefix(action, "DENY") {
 		level = slog.LevelWarn
+		if s.webhook != nil {
+			s.webhook.Notify(webhook.BlockEvent{
+				Action: action,
+				Model:  model,
+				Email:  email,
+				Reason: reason,
+				Prompt: prompt,
+			})
+		}
 	}
 	slog.LogAttrs(context.Background(), level, action,
 		slog.String("action", action),
