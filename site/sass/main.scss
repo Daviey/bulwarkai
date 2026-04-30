@@ -64,31 +64,7 @@ code {
   color: $gold-dark;
 }
 
-pre {
-  font-family: $mono;
-  font-size: 0.84em;
-  line-height: 1.7;
-  background: #1a1a1a;
-  color: #d4d4d8;
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: $radius-lg;
-  padding: 1.4rem 1.6rem;
-  overflow-x: auto;
-}
 
-pre code {
-  background: none;
-  padding: 0;
-  color: inherit;
-  font-size: inherit;
-}
-
-pre.giallo {
-  background: #1a1a1a;
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: $radius-lg;
-  padding: 1.4rem 1.6rem;
-}
 
 .wrap {
   max-width: $max-w;
@@ -134,6 +110,12 @@ pre.giallo {
   }
 }
 
+// ── Animations ──
+@keyframes hero-glow {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  50% { opacity: 0.9; transform: translateX(-50%) scale(1.05) translateY(2%); }
+}
+
 // ── Hero ──
 .hero {
   min-height: 82vh;
@@ -143,18 +125,19 @@ pre.giallo {
   padding-bottom: 6vh;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(170deg, #1C1915 0%, #2A2520 40%, #1C1915 100%);
+  background: linear-gradient(170deg, #181512 0%, #2A2520 40%, #110E0B 100%);
   color: #E8E4D9;
   &::before {
     content: '';
     position: absolute;
-    top: -20%;
+    top: -30%;
     left: 50%;
     transform: translateX(-50%);
-    width: 120%;
-    height: 80%;
-    background: radial-gradient(ellipse, rgba(201, 168, 76, 0.10) 0%, transparent 50%);
+    width: 140%;
+    height: 100%;
+    background: radial-gradient(ellipse, rgba(201, 168, 76, 0.12) 0%, rgba(155, 35, 53, 0.05) 30%, transparent 60%);
     pointer-events: none;
+    animation: hero-glow 10s ease-in-out infinite;
   }
   &::after {
     content: '';
@@ -228,14 +211,15 @@ pre.giallo {
   cursor: pointer;
   border: none;
   &.gold {
-    background: #C9A84C;
+    background: linear-gradient(180deg, #D4B55A 0%, #C9A84C 100%);
     color: #1C1915;
-    box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3);
+    box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
     &:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 24px rgba(201, 168, 76, 0.4);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(201, 168, 76, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
       color: #1C1915;
       text-decoration: none;
+      background: linear-gradient(180deg, #DDC06A 0%, #D4B55A 100%);
     }
     &:active { transform: translateY(0); }
   }
@@ -388,17 +372,17 @@ section.alt {
   }
   h2 {
     font-family: $serif;
-    font-size: 2.2rem;
+    font-size: 2.4rem;
     font-weight: 700;
-    letter-spacing: -0.02em;
-    margin-bottom: 0.6rem;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.8rem;
     color: $text;
     line-height: 1.15;
   }
   p {
     color: $text-2;
-    font-size: 1.05rem;
-    line-height: 1.7;
+    font-size: 1.1rem;
+    line-height: 1.75;
     max-width: 640px;
   }
 }
@@ -420,29 +404,40 @@ section.alt {
 }
 
 .callout {
-  background: #fff;
-  border: 1px solid $border;
-  border-left: 3px solid $crimson;
+  background: #1C1915;
+  color: #E8E4D9;
+  border: 1px solid rgba(155, 35, 53, 0.4);
+  border-left: 4px solid $crimson;
   border-radius: $radius-lg;
-  padding: 1.4rem 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  padding: 1.8rem 1.8rem;
+  box-shadow: 0 12px 30px rgba(155, 35, 53, 0.1);
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 100%;
+    background: linear-gradient(135deg, rgba(155, 35, 53, 0.1) 0%, transparent 100%);
+    pointer-events: none;
+  }
   h3 {
     font-family: $serif;
-    font-size: 0.8rem;
-    margin-bottom: 0.8rem;
-    color: $crimson;
+    font-size: 0.9rem;
+    margin-bottom: 1.2rem;
+    color: #FF5F56;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    position: relative;
   }
-  ul { list-style: none; }
+  ul { list-style: none; position: relative; }
   li {
-    padding: 0.4rem 0;
-    font-size: 0.86rem;
-    color: $text-2;
-    border-bottom: 1px solid $border;
-    &:last-child { border-bottom: none; }
-    .dot { color: $crimson; margin-right: 0.5rem; font-size: 0.4rem; vertical-align: middle; }
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #d4d4d8;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    &:last-child { border-bottom: none; padding-bottom: 0; }
+    .dot { color: #FF5F56; margin-right: 0.6rem; font-size: 0.5rem; vertical-align: middle; }
   }
 }
 
@@ -454,17 +449,19 @@ section.alt {
   margin-bottom: 2rem;
 }
 .insp {
-  background: #fff;
-  border: 1px solid $border;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: $radius-lg;
   padding: 1.8rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
   &:hover {
+    background: #fff;
     border-color: $gold-border;
-    box-shadow: 0 8px 24px rgba(139, 105, 20, 0.08);
-    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(139, 105, 20, 0.08);
+    transform: translateY(-4px);
   }
   .icon {
     width: 44px; height: 44px;
@@ -506,16 +503,18 @@ section.alt {
   margin-top: 2rem;
 }
 .mode {
-  background: #fff;
-  border: 1px solid $border;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: $radius-lg;
   padding: 1.8rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
   &:hover {
+    background: #fff;
     border-color: $gold-border;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.06);
   }
   h3 {
     font-family: $serif;
@@ -548,17 +547,64 @@ section.alt {
 
 // ── Code block ──
 .code-block {
-  background: #1C1915;
+  background: #0D0C0A;
   color: #d4d4d8;
-  border: 1px solid $border;
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: $radius-lg;
-  padding: 1.4rem 1.6rem;
+  padding: 2.8rem 1.6rem 1.4rem;
   overflow-x: auto;
   margin: 1.5rem 0;
   position: relative;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+  &::before {
+    content: '';
+    position: absolute;
+    top: 1rem; left: 1.2rem;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #FF5F56;
+    box-shadow: 18px 0 0 #FFBD2E, 36px 0 0 #27C93F;
+  }
   .comment { color: #555; }
   .string { color: #A8D88E; }
   .key { color: #C9A84C; }
+}
+
+pre {
+  font-family: $mono;
+  font-size: 0.84em;
+  line-height: 1.7;
+  background: #0D0C0A;
+  color: #d4d4d8;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: $radius-lg;
+  padding: 2.8rem 1.6rem 1.4rem;
+  overflow-x: auto;
+  position: relative;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+  &::before {
+    content: '';
+    position: absolute;
+    top: 1rem; left: 1.2rem;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #FF5F56;
+    box-shadow: 18px 0 0 #FFBD2E, 36px 0 0 #27C93F;
+  }
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+pre.giallo {
+  background: #0D0C0A;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: $radius-lg;
+  padding: 2.8rem 1.6rem 1.4rem;
 }
 
 // ── API cards ──
@@ -569,16 +615,18 @@ section.alt {
   margin-bottom: 1.2rem;
 }
 .api-card {
-  background: #fff;
-  border: 1px solid $border;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: $radius-lg;
   padding: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
   &:hover {
+    background: #fff;
     border-color: $gold-border;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.06);
   }
   .api-head {
     display: flex;
@@ -745,14 +793,15 @@ section.alt {
   gap: 1.2rem;
 }
 .doc-card {
-  background: #fff;
-  border: 1px solid $border;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   border-radius: $radius-lg;
   padding: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.02);
   &::after {
     content: '';
     position: absolute;
@@ -763,9 +812,10 @@ section.alt {
     transition: opacity 0.3s;
   }
   &:hover {
+    background: #fff;
     border-color: $gold-border;
-    box-shadow: 0 8px 24px rgba(139, 105, 20, 0.08);
-    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(139, 105, 20, 0.08);
+    transform: translateY(-4px);
     text-decoration: none;
     color: $gold-dark;
     &::after { opacity: 1; }
