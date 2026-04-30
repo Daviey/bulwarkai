@@ -95,6 +95,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  terraform:
+    name: Terraform Validate & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: "1.9.0"
+      - run: tofu -chdir=terraform init -backend=false
+      - run: tofu -chdir=terraform validate
+      - run: tofu -chdir=terraform test
+
   build:
     name: Build
     runs-on: ubuntu-latest
