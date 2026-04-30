@@ -45,7 +45,7 @@ func NewEngine(ctx context.Context, enabled bool, policyFile string, policyConte
 
 	content := policyContent
 	if content == "" && policyFile != "" {
-		data, err := os.ReadFile(policyFile)
+		data, err := os.ReadFile(policyFile) //nosec G304
 		if err != nil {
 			return nil, fmt.Errorf("read policy file %s: %w", policyFile, err)
 		}
