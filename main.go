@@ -88,7 +88,6 @@ func main() {
 	} else {
 		caller = vertex.NewClient(cfg, httpClient)
 	}
-	server := handler.NewServer(cfg, chain, caller, httpClient, policyEngine, wh)
 
 	var rateLimiter *ratelimit.Limiter
 	if cfg.RateLimit > 0 {
@@ -103,6 +102,8 @@ func main() {
 			}
 		}()
 	}
+
+	server := handler.NewServer(cfg, chain, caller, httpClient, policyEngine, wh, rateLimiter)
 
 	slog.Info("bulwarkai starting", "version", version, "mode", cfg.ResponseMode, "inspectors", chain.Names(), "template", cfg.ModelArmorTemplate, "model", cfg.FallbackGeminiModel, "local", cfg.LocalMode, "demo", cfg.DemoMode)
 

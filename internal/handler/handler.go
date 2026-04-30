@@ -34,16 +34,21 @@ func (w *statusWriter) WriteHeader(code int) {
 }
 
 type Server struct {
-	cfg        *config.Config
-	chain      inspector.Chain
-	vertex     vertex.VertexCaller
-	httpClient *http.Client
-	policy     *policy.Engine
-	webhook    *webhook.Notifier
+	cfg         *config.Config
+	chain       inspector.Chain
+	vertex      vertex.VertexCaller
+	httpClient  *http.Client
+	policy      *policy.Engine
+	webhook     *webhook.Notifier
+	rateLimiter RateLimiter
 }
 
-func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client, eng *policy.Engine, wh *webhook.Notifier) *Server {
-	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient, policy: eng, webhook: wh}
+type RateLimiter interface {
+	Allow(key string) bool
+}
+
+func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client, eng *policy.Engine, wh *webhook.Notifier, rl RateLimiter) *Server {
+	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient, policy: eng, webhook: wh, rateLimiter: rl}
 }
 
 func ctxLogger(ctx context.Context) *slog.Logger {
@@ -66,7 +71,31 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/projects/", s.ServeVertexProject)
 	mux.HandleFunc("/v1/projects/", s.ServeVertexProject)
 	mux.Handle("/metrics", promhttp.Handler())
-	return s.requestMiddleware(mux)
+	return s.rateLimitMiddleware(s.requestMiddleware(mux))
+}
+
+func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
+	if s.rateLimiter == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		email := extractEmailFromRequest(r)
+		if email != "" && !s.rateLimiter.Allow(email) {
+			metrics.RequestsTotal.WithLabelValues("RATE_LIMITED", "").Inc()
+			metrics.RateLimitExceeded.WithLabelValues(email).Inc()
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func extractEmailFromRequest(r *http.Request) string {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if token == "" {
+		return ""
+	}
+	return auth.ExtractEmailFromJWT(token)
 }
 
 func (s *Server) requestMiddleware(next http.Handler) http.Handler {
@@ -80,8 +109,9 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 		if idx := strings.Index(traceID, "/"); idx > 0 {
 			traceID = traceID[:idx]
 		}
+		email := extractEmailFromRequest(r)
 		ctx := context.WithValue(r.Context(), requestIDKey, reqID)
-		logger := slog.With("request_id", reqID, "method", r.Method, "path", r.URL.Path)
+		logger := slog.With("request_id", reqID, "method", r.Method, "path", r.URL.Path, "email", email)
 		if traceID != "" {
 			logger = logger.With("trace_id", traceID)
 		}
@@ -98,7 +128,7 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(sw, r.WithContext(ctx))
 		duration := time.Since(start).Seconds()
 		metrics.RequestDuration.WithLabelValues("request").Observe(duration)
-		logger.Info("request completed", "status", sw.status, "duration_ms", time.Since(start).Milliseconds())
+		logger.Info("request completed", "status", sw.status, "duration_ms", time.Since(start).Milliseconds(), "user_agent", r.UserAgent())
 	})
 }
 
@@ -121,7 +151,7 @@ func (s *Server) checkPolicy(w http.ResponseWriter, r *http.Request, identity *a
 }
 
 // @Summary Health check
-// @Description Returns service status and current screening mode
+// @Description Returns service status, screening mode, and component health
 // @Tags Health
 // @Produce json
 // @Success 200 {object} map[string]string
@@ -134,6 +164,13 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.policy != nil {
 		resp["opa"] = "enabled"
+		resp["opa_status"] = s.policy.Status()
+	}
+	if s.webhook != nil {
+		resp["webhook"] = "enabled"
+	}
+	if s.rateLimiter != nil {
+		resp["rate_limit"] = "enabled"
 	}
 	writeJSON(w, resp)
 }

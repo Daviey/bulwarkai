@@ -26,6 +26,7 @@ Counter for every completed request. The `action` label values:
 | `DENY_DOMAIN` | Email domain not in allowlist |
 | `DENY_UA` | User-Agent did not match configured regex |
 | `DENY_POLICY` | OPA policy engine denied the request |
+| `RATE_LIMITED` | Per-email rate limit exceeded |
 
 #### Inspector results
 
@@ -72,6 +73,12 @@ Number of requests currently being processed.
 `bulwarkai_request_body_bytes`
 
 Request body size histogram.
+
+#### Rate limiting
+
+`bulwarkai_rate_limit_exceeded_total{email}`
+
+Counter for rate limit exceeded events. Only recorded when `RATE_LIMIT > 0`.
 
 ### Alerting examples
 
@@ -127,6 +134,14 @@ rate(bulwarkai_policy_results_total{result="error"}[5m]) > 0
 ```
 
 The `error` counter fires when OPA evaluation fails. A broken Rego policy would cause this.
+
+#### Rate limit exceeded
+
+```promql
+sum by (email) (rate(bulwarkai_rate_limit_exceeded_total[5m]))
+```
+
+Users hitting the rate limit frequently may need their limit raised or may be running automated scripts.
 
 #### Audit mode data leakage
 
@@ -229,6 +244,7 @@ Every request produces a structured log entry. The `action` field tells you what
 | `DENY_DOMAIN` | WARN | Authenticated user's email domain not in allowlist |
 | `DENY_UA` | WARN | User-Agent did not match configured regex |
 | `DENY_POLICY` | WARN | OPA policy engine denied the request |
+| `RATE_LIMITED` | WARN | Per-email rate limit exceeded |
 
 Inspector errors are logged separately at ERROR level with `inspector error (fail-open)`.
 

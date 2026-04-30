@@ -118,6 +118,21 @@ func (e *Engine) Stop() {
 	}
 }
 
+func (e *Engine) Status() string {
+	if !e.enabled {
+		return "disabled"
+	}
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	source := "inline"
+	if e.policyFile != "" {
+		source = "file:" + e.policyFile
+	} else if e.policyURL != "" {
+		source = "url:" + e.policyURL
+	}
+	return "active:" + source
+}
+
 func (e *Engine) Evaluate(ctx context.Context, input Input) *Decision {
 	if !e.enabled {
 		metrics.PolicyResults.WithLabelValues("allow").Inc()

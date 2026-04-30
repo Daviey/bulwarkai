@@ -43,4 +43,9 @@ var (
 		Name: "bulwarkai_policy_results_total",
 		Help: "Policy engine evaluation results",
 	}, []string{"result"})
+
+	RateLimitExceeded = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "bulwarkai_rate_limit_exceeded_total",
+		Help: "Rate limit exceeded events",
+	}, []string{"email"})
 )

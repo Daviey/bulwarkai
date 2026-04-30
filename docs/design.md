@@ -11,6 +11,7 @@ graph LR
     end
 
     subgraph Bulwarkai [Bulwarkai - Cloud Run]
+        RL[0. Rate limit]
         AUTH[1. Authenticate]
         UA[2. User-Agent check]
         POL[2.5. Policy check]
@@ -22,10 +23,10 @@ graph LR
         TR2[8. Translate response]
     end
 
-    OC -->|TLS| AUTH
-    CC -->|TLS| AUTH
-    CU -->|TLS| AUTH
-    AUTH --> UA --> POL --> EXT --> INSP --> TR --> VC
+    OC -->|TLS| RL
+    CC -->|TLS| RL
+    CU -->|TLS| RL
+    RL --> AUTH --> UA --> POL --> EXT --> INSP --> TR --> VC
     VC --> INSR --> TR2
 
     POL -.->|rego eval| OPA[OPA Engine]
@@ -162,7 +163,7 @@ When `RATE_LIMIT` is set to a value greater than 0, a fixed-window rate limiter 
 
 Expired windows are cleaned up periodically. The implementation uses a sync.Mutex with a map of counters. This is sufficient for a single-instance Cloud Run deployment. For multi-instance deployments, an external rate limiting store (Redis, Memcached) would be needed.
 
-Rate-limited requests receive HTTP 429 and are logged.
+Rate-limited requests receive HTTP 429 and are logged. The rate limiter is wired into the HTTP middleware chain before authentication, so it applies to all requests including those that would fail auth. The `bulwarkai_rate_limit_exceeded_total{email}` metric tracks rejections per user.
 
 ## Webhook Notifications
 
@@ -349,7 +350,7 @@ The service exposes Prometheus metrics at `/metrics`. Three metric families cove
 
 `bulwarkai_policy_results_total{result}` counts OPA policy engine evaluations when enabled. The `result` label is `allow`, `deny`, or `error`.
 
-Latency is tracked with `bulwarkai_request_duration_seconds{action}` for end-to-end requests and `bulwarkai_inspector_duration_seconds{inspector, direction}` for per-inspector timing. Active request count is available as `bulwarkai_active_requests`.
+Latency is tracked with `bulwarkai_request_duration_seconds{action}` for end-to-end requests and `bulwarkai_inspector_duration_seconds{inspector, direction}` for per-inspector timing. Active request count is available as `bulwarkai_active_requests`. Request body size is tracked with `bulwarkai_request_body_bytes`. Rate limit rejections are tracked with `bulwarkai_rate_limit_exceeded_total{email}`.
 
 See `docs/operations.md` for PromQL alerting queries and dashboard layouts.
 
