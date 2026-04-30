@@ -80,6 +80,48 @@ resource "google_cloud_run_v2_service" "bulwarkai" {
           value = env.value
         }
       }
+      dynamic "env" {
+        for_each = var.opa_enabled ? ["true"] : []
+        content {
+          name  = "OPA_ENABLED"
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.opa_enabled && var.opa_policy_content != "" ? ["https://storage.googleapis.com/${local.service_name}-config/opa/policy.rego"] : []
+        content {
+          name  = "OPA_POLICY_URL"
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.rate_limit > 0 ? [tostring(var.rate_limit)] : []
+        content {
+          name  = "RATE_LIMIT"
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.rate_limit > 0 ? [var.rate_limit_window] : []
+        content {
+          name  = "RATE_LIMIT_WINDOW"
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.webhook_url != "" ? [var.webhook_url] : []
+        content {
+          name  = "WEBHOOK_URL"
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = var.webhook_secret != "" ? [var.webhook_secret] : []
+        content {
+          name  = "WEBHOOK_SECRET"
+          value = env.value
+        }
+      }
 
       resources {
         limits = {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -31,6 +32,10 @@ type Config struct {
 	OPAEnabled          bool
 	OPAPolicyFile       string
 	OPAPolicyURL        string
+	RateLimit           int
+	RateLimitWindow     string
+	WebhookURL          string
+	WebhookSecret       string
 }
 
 func Load() *Config {
@@ -55,6 +60,10 @@ func Load() *Config {
 		OPAEnabled:          os.Getenv("OPA_ENABLED") == "true",
 		OPAPolicyFile:       EnvOr("OPA_POLICY_FILE", ""),
 		OPAPolicyURL:        EnvOr("OPA_POLICY_URL", ""),
+		RateLimit:           EnvInt("RATE_LIMIT", 0),
+		RateLimitWindow:     EnvOr("RATE_LIMIT_WINDOW", "1m"),
+		WebhookURL:          EnvOr("WEBHOOK_URL", ""),
+		WebhookSecret:       EnvOr("WEBHOOK_SECRET", ""),
 	}
 	c.ModelArmorEndpoint = "https://modelarmor." + c.ModelArmorLocation + ".rep.googleapis.com"
 	if ua := os.Getenv("USER_AGENT_REGEX"); ua != "" {
@@ -79,6 +88,18 @@ func EnvOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func EnvInt(key string, def int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }
 
 func SplitEnv(key, def string) []string {

@@ -58,8 +58,30 @@ Model Armor is loaded as an inspector when `MODEL_ARMOR_TEMPLATE` is non-empty a
 | Variable | Type | Default | Description |
 |---|---|---|---|
 | `OPA_ENABLED` | string | unset | Set to `"true"` to enable the OPA policy engine. Any other value (or unset) disables it. |
-| `OPA_POLICY_FILE` | string | none | Path to a Rego policy file on disk. Loaded at startup. If not set, falls back to the default permissive policy. |
-| `OPA_POLICY_URL` | string | none | Inline Rego policy content. Reserved for future GCS bundle support. If not set, falls back to the default permissive policy. |
+| `OPA_POLICY_FILE` | string | none | Path to a Rego policy file on disk. Loaded at startup and watched for changes. When the file changes, the policy is recompiled and swapped in atomically. |
+| `OPA_POLICY_URL` | string | none | URL to fetch Rego policy content from. Supports any HTTP(S) URL (GCS signed URLs, S3 presigned URLs, internal config servers). The URL is polled every 30 seconds and the policy is reloaded when the response changes. Can also be used for inline Rego content (non-URL strings are compiled directly). |
+
+When both `OPA_POLICY_FILE` and `OPA_POLICY_URL` are set, the file takes precedence.
+
+Hot-reload behavior: if the new policy fails to compile, the old policy remains active and an error is logged. This prevents a syntax error in a policy file from blocking all traffic.
+
+## Rate Limiting
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `RATE_LIMIT` | int | `0` | Maximum number of requests per user per time window. Set to 0 to disable rate limiting. |
+| `RATE_LIMIT_WINDOW` | string (Go duration) | `1m` | Time window for rate limit counting. Must be a valid Go duration string (e.g. `30s`, `5m`, `1h`). |
+
+Rate limiting is per email address. Requests that exceed the limit receive HTTP 429. API key requests are rate-limited under the shared `apikey@domain` identity.
+
+## Webhook Notifications
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `WEBHOOK_URL` | string | none | URL to send HTTP POST notifications for BLOCK and DENY events. When set, every block event triggers an async JSON payload to this URL. Leave empty to disable webhook notifications. |
+| `WEBHOOK_SECRET` | string | none | Secret token sent in the `X-Webhook-Secret` header with each notification. Use this to verify that payloads come from Bulwarkai. |
+
+The webhook payload is a JSON object with fields: `timestamp`, `action`, `model`, `email`, `reason`, `request_id`, `prompt`. Notifications are sent asynchronously from a buffered queue (256 events). If the queue is full, events are dropped and a warning is logged. The webhook client has a 10-second timeout per request. Non-2xx responses are logged as warnings.
 
 ## Authentication
 

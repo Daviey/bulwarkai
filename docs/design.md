@@ -135,11 +135,42 @@ All authentication requires the email domain to be in `ALLOWED_DOMAINS`.
 
 When enabled via `OPA_ENABLED=true`, an embedded Open Policy Agent evaluates access control decisions after authentication but before content inspection. The policy engine receives the caller email, requested model, streaming flag, and request path. It never sees prompt or response text.
 
-The policy is loaded at startup from `OPA_POLICY_FILE` (file path on disk) or inline Rego content via `OPA_POLICY_URL`. If neither is set, a permissive default policy (`allow := true`) is used.
+The policy is loaded at startup from `OPA_POLICY_FILE` (file path on disk) or `OPA_POLICY_URL` (HTTP URL or inline Rego content). If neither is set, a permissive default policy (`allow := true`) is used.
 
 Evaluation is synchronous and in-process using the `rego` package. A typical policy evaluation takes under 100 microseconds. On evaluation errors, the engine fails open and logs the error.
 
 Pipeline position: auth, then policy engine, then inspector chain, then Vertex AI.
+
+### Policy Hot-Reload
+
+When `OPA_POLICY_FILE` is set, the engine polls the file every 5 seconds. When the file's modification time changes, the new content is compiled and swapped in atomically using a read-write lock. If the new policy fails to compile, the old policy remains active and an error is logged. This prevents a syntax error from blocking all traffic.
+
+When `OPA_POLICY_URL` is set to an HTTP(S) URL, the engine polls the URL every 30 seconds. If the response is a valid Rego policy, it replaces the current policy. Non-2xx responses and compilation errors are logged and the existing policy is preserved.
+
+### Policy Loading Sources
+
+`OPA_POLICY_FILE`: local file system path. The file is read once at startup, then polled for changes.
+
+`OPA_POLICY_URL`: three modes:
+1. HTTP(S) URL: fetched at startup, then polled for changes. Works with GCS signed URLs, S3 presigned URLs, or any HTTP endpoint that serves Rego content.
+2. Non-URL string: compiled directly as inline Rego content at startup. No hot-reload.
+3. Empty: falls back to the default permissive policy.
+
+## Rate Limiting
+
+When `RATE_LIMIT` is set to a value greater than 0, a fixed-window rate limiter enforces per-user request limits. The limit applies per email address, using the identity resolved during authentication. API key requests share the `apikey@<domain>` identity.
+
+Expired windows are cleaned up periodically. The implementation uses a sync.Mutex with a map of counters. This is sufficient for a single-instance Cloud Run deployment. For multi-instance deployments, an external rate limiting store (Redis, Memcached) would be needed.
+
+Rate-limited requests receive HTTP 429 and are logged.
+
+## Webhook Notifications
+
+When `WEBHOOK_URL` is set, every BLOCK and DENY event triggers an asynchronous HTTP POST to the configured URL. The payload is a JSON object containing the event timestamp, action type, model name, user email, block reason, request ID, and (redacted) prompt text.
+
+Notifications are sent from a buffered queue (256 events). If the queue is full, events are dropped and a warning is logged. This prevents webhook backpressure from affecting request processing latency.
+
+The webhook client sets a `Content-Type: application/json` header and optionally an `X-Webhook-Secret` header (when `WEBHOOK_SECRET` is configured). The client has a 10-second timeout per request. Non-2xx responses are logged as warnings but do not trigger retries.
 
 ## Request Flow
 
@@ -185,8 +216,12 @@ All configuration is through environment variables.
 | `DLP_MIN_LIKELIHOOD` | `LIKELY` | Minimum DLP finding likelihood |
 | `DLP_LOCATION` | (uses `GOOGLE_CLOUD_LOCATION`) | DLP API location |
 | `OPA_ENABLED` | (empty) | Set to `true` to enable the OPA policy engine |
-| `OPA_POLICY_FILE` | (empty) | Path to a Rego policy file on disk |
-| `OPA_POLICY_URL` | (empty) | Inline Rego policy content (reserved for future GCS bundle support) |
+| `OPA_POLICY_FILE` | (empty) | Path to a Rego policy file on disk (hot-reloaded) |
+| `OPA_POLICY_URL` | (empty) | HTTP URL or inline Rego policy content (URL polled every 30s) |
+| `RATE_LIMIT` | `0` | Per-user request limit per window (0 to disable) |
+| `RATE_LIMIT_WINDOW` | `1m` | Rate limit time window (Go duration) |
+| `WEBHOOK_URL` | (empty) | URL for block event notifications |
+| `WEBHOOK_SECRET` | (empty) | Secret token for webhook verification |
 | `PORT` | `8080` | HTTP listen port |
 | `LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LOG_PROMPT_MODE` | `truncate` | How prompts appear in logs: `truncate` (first 32 chars), `hash` (SHA-256 prefix), `full`, `none` |

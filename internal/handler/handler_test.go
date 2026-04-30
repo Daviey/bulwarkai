@@ -25,7 +25,7 @@ func testConfig() *config.Config {
 
 func testServer(cfg *config.Config, vc vertex.VertexCaller) *Server {
 	chain := inspector.NewChain()
-	return NewServer(cfg, chain, vc, http.DefaultClient, nil)
+	return NewServer(cfg, chain, vc, http.DefaultClient, nil, nil)
 }
 
 func TestHealthEndpoint(t *testing.T) {

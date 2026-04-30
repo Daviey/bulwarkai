@@ -15,6 +15,7 @@ import (
 	"github.com/Daviey/bulwarkai/internal/metrics"
 	"github.com/Daviey/bulwarkai/internal/policy"
 	"github.com/Daviey/bulwarkai/internal/vertex"
+	"github.com/Daviey/bulwarkai/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -38,10 +39,11 @@ type Server struct {
 	vertex     vertex.VertexCaller
 	httpClient *http.Client
 	policy     *policy.Engine
+	webhook    *webhook.Notifier
 }
 
-func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client, eng *policy.Engine) *Server {
-	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient, policy: eng}
+func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client, eng *policy.Engine, wh *webhook.Notifier) *Server {
+	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient, policy: eng, webhook: wh}
 }
 
 func ctxLogger(ctx context.Context) *slog.Logger {
@@ -90,6 +92,9 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		metrics.ActiveRequests.Inc()
 		defer metrics.ActiveRequests.Dec()
+		if r.ContentLength > 0 {
+			metrics.RequestBodySize.Observe(float64(r.ContentLength))
+		}
 		next.ServeHTTP(sw, r.WithContext(ctx))
 		duration := time.Since(start).Seconds()
 		metrics.RequestDuration.WithLabelValues("request").Observe(duration)
@@ -101,16 +106,12 @@ func (s *Server) checkPolicy(w http.ResponseWriter, r *http.Request, identity *a
 	if s.policy == nil {
 		return true
 	}
-	dec, err := s.policy.Evaluate(r.Context(), policy.Input{
+	dec := s.policy.Evaluate(r.Context(), policy.Input{
 		Email:  identity.Email,
 		Model:  model,
 		Stream: stream,
 		Path:   r.URL.Path,
 	})
-	if err != nil {
-		slog.Error("opa evaluate error", "error", err)
-		return true
-	}
 	if !dec.Allowed {
 		s.logAction("DENY_POLICY", model, "", dec.Reason, identity.Email)
 		http.Error(w, dec.Reason, http.StatusForbidden)
