@@ -285,7 +285,9 @@ The service never stores tokens. Bearer tokens are used for the duration of the 
 
 ### Inspector Fail-Open Semantics
 
-When an inspector cannot reach its backend (Model Armor, DLP), it returns nil (pass) rather than blocking the request. This is a conscious decision: the cost of blocking all AI traffic during a DLP outage exceeds the cost of an unscreened request. The `strict` mode's use of non-streaming calls means Model Armor's Vertex AI integration still provides a baseline enforcement even when the standalone API is down. The OPA policy engine follows the same fail-open philosophy: a broken policy does not block all traffic.
+When an inspector cannot reach its backend (Model Armor, DLP), it returns a `BlockResult` with the `Err` field set rather than blocking the request. This is a conscious decision: the cost of blocking all AI traffic during a DLP outage exceeds the cost of an unscreened request. The `strict` mode's use of non-streaming calls means Model Armor's Vertex AI integration still provides a baseline enforcement even when the standalone API is down. The OPA policy engine follows the same fail-open philosophy: a broken policy does not block all traffic.
+
+Fail-open events are counted in `bulwarkai_inspector_results_total{result="error"}` and logged at ERROR level with the message `inspector error (fail-open)`. Alert on any non-zero rate for this metric.
 
 The Terraform configuration (`ignore_partial_invocation_failures = false`) adds a platform-level fail-closed override. When Model Armor itself is unavailable, the Vertex AI integration rejects the call rather than skipping sanitization. This is separate from the application-layer inspector behavior.
 
@@ -296,11 +298,25 @@ All events use structured JSON logging via `slog`. Each request carries:
 - Trace ID (from `X-Cloud-Trace-Context` when present)
 - User email
 - Model name
-- Action (`ALLOW`, `BLOCK_PROMPT`, `BLOCK_RESPONSE`, `BLOCK_RESPONSE_AUDIT`, `DENY_DOMAIN`, `DENY_UA`)
+- Action (`ALLOW`, `BLOCK_PROMPT`, `BLOCK_RESPONSE`, `BLOCK_RESPONSE_AUDIT`, `DENY_DOMAIN`, `DENY_UA`, `DENY_POLICY`)
 - Block reason (when applicable)
 - Duration in milliseconds
 
-Block events log at `WARN` level. Allow events at `INFO`. Internal errors at `ERROR`. Logs are emitted to stdout and collected by Cloud Logging.
+Block events log at `WARN` level. Allow events at `INFO`. Inspector fail-open errors at `ERROR`. Logs are emitted to stdout and collected by Cloud Logging.
+
+### Metrics
+
+The service exposes Prometheus metrics at `/metrics`. Three metric families cover the request lifecycle:
+
+`bulwarkai_requests_total{action, model}` counts every completed request by outcome (allow, block, deny).
+
+`bulwarkai_inspector_results_total{inspector, direction, result}` counts each inspector evaluation. The `result` label is `pass` (clean), `block` (violation found), or `error` (fail-open: the inspector could not evaluate). The `inspector` label is `regex`, `model_armor`, or `dlp`. The `direction` label is `prompt` or `response`.
+
+`bulwarkai_policy_results_total{result}` counts OPA policy engine evaluations when enabled. The `result` label is `allow`, `deny`, or `error`.
+
+Latency is tracked with `bulwarkai_request_duration_seconds{action}` for end-to-end requests and `bulwarkai_inspector_duration_seconds{inspector, direction}` for per-inspector timing. Active request count is available as `bulwarkai_active_requests`.
+
+See `docs/operations.md` for PromQL alerting queries and dashboard layouts.
 
 ### Response Mode Security Properties
 
@@ -314,7 +330,7 @@ Block events log at `WARN` level. Allow events at `INFO`. Internal errors at `ER
 
 ### Supply Chain
 
-The Go binary has three direct dependencies: `google/uuid`, `anthropics/anthropic-sdk-go`, and `openai/openai-go/v3` (the latter two for test-only SDK compliance checks). The Docker runtime has zero OS packages. The attack surface for supply-chain compromise is the Go module proxy, the Artifact Registry, and Cloud Run itself.
+The Go binary has direct dependencies on `google/uuid`, `anthropics/anthropic-sdk-go`, `openai/openai-go/v3` (the latter two for test-only SDK compliance checks), and `open-policy-agent/opa/rego` (for the embedded policy engine). The Docker runtime has zero OS packages. The attack surface for supply-chain compromise is the Go module proxy, the Artifact Registry, and Cloud Run itself.
 
 ### Network
 
