@@ -33,4 +33,14 @@ var (
 		Help:    "Request body size in bytes",
 		Buckets: []float64{100, 1000, 10000, 100000, 500000, 1e6, 5e6, 10e6},
 	})
+
+	InspectorResults = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "bulwarkai_inspector_results_total",
+		Help: "Inspector evaluation results",
+	}, []string{"inspector", "direction", "result"})
+
+	PolicyResults = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "bulwarkai_policy_results_total",
+		Help: "Policy engine evaluation results",
+	}, []string{"result"})
 )

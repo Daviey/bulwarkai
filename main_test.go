@@ -2007,7 +2007,7 @@ func TestModelArmorInspectorHTTPError(t *testing.T) {
 	ma := inspector.NewModelArmorInspector(testCfg, maServer.Client())
 
 	br := ma.InspectPrompt(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected HTTP error to be treated as pass (fail open)")
 	}
 }
@@ -2023,7 +2023,7 @@ func TestModelArmorInspectorConnectionError(t *testing.T) {
 	}
 	ma := inspector.NewModelArmorInspector(testCfg, http.DefaultClient)
 	br := ma.InspectPrompt(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected connection error to fail open")
 	}
 }
@@ -2098,7 +2098,7 @@ func TestDLPInspectorHTTPErr(t *testing.T) {
 	testCfg := &config.Config{Project: "test", Location: "europe-west2"}
 	dlp := inspector.NewDLPInspector(testCfg, dlpServer.Client())
 	br := dlp.InspectPrompt(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected fail open on non-ok response")
 	}
 }
@@ -2333,7 +2333,7 @@ func TestDLPInspectResponseDelegate(t *testing.T) {
 	testCfg := &config.Config{Project: "test", Location: "europe-west2"}
 	dlp := inspector.NewDLPInspector(testCfg, http.DefaultClient)
 	br := dlp.InspectResponse(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected fail open on connection error")
 	}
 }
@@ -2702,7 +2702,7 @@ func TestDLPInspectConnectionError(t *testing.T) {
 	testCfg := &config.Config{Project: "test", Location: "europe-west2"}
 	dlp := inspector.NewDLPInspector(testCfg, http.DefaultClient)
 	br := dlp.InspectPrompt(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected connection error to fail open")
 	}
 }
@@ -2713,7 +2713,7 @@ func TestDLPInspectRequestError(t *testing.T) {
 	testCfg := &config.Config{Project: "test", Location: "europe-west2"}
 	dlp := inspector.NewDLPInspector(testCfg, http.DefaultClient)
 	br := dlp.InspectPrompt(context.Background(), "test", "fake-token")
-	if br != nil {
+	if br != nil && br.Blocked {
 		t.Error("expected request error to fail open")
 	}
 }

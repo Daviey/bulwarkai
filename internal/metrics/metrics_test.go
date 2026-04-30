@@ -6,6 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -87,4 +88,20 @@ func hasLabel(lps []*dto.LabelPair, name, value string) bool {
 		}
 	}
 	return false
+}
+
+func TestInspectorResultsCounter(t *testing.T) {
+	InspectorResults.WithLabelValues("regex", "prompt", "pass").Inc()
+	count := testutil.ToFloat64(InspectorResults.WithLabelValues("regex", "prompt", "pass"))
+	if count == 0 {
+		t.Fatal("expected counter to be registered")
+	}
+}
+
+func TestPolicyResultsCounter(t *testing.T) {
+	PolicyResults.WithLabelValues("allow").Inc()
+	count := testutil.ToFloat64(PolicyResults.WithLabelValues("allow"))
+	if count == 0 {
+		t.Fatal("expected counter to be registered")
+	}
 }

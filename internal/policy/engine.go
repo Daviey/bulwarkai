@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/Daviey/bulwarkai/internal/metrics"
 	"github.com/open-policy-agent/opa/ast"
 	"github.com/open-policy-agent/opa/rego"
 )
@@ -70,6 +71,7 @@ func NewEngine(ctx context.Context, enabled bool, policyFile string, policyConte
 
 func (e *Engine) Evaluate(ctx context.Context, input Input) (*Decision, error) {
 	if !e.enabled {
+		metrics.PolicyResults.WithLabelValues("allow").Inc()
 		return &Decision{Allowed: true}, nil
 	}
 
@@ -79,10 +81,12 @@ func (e *Engine) Evaluate(ctx context.Context, input Input) (*Decision, error) {
 	results, err := e.prepared.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
 		slog.Error("opa eval error", "error", err)
+		metrics.PolicyResults.WithLabelValues("error").Inc()
 		return &Decision{Allowed: true}, nil
 	}
 
 	if len(results) == 0 || len(results[0].Expressions) == 0 {
+		metrics.PolicyResults.WithLabelValues("allow").Inc()
 		return &Decision{Allowed: true}, nil
 	}
 
@@ -90,8 +94,14 @@ func (e *Engine) Evaluate(ctx context.Context, input Input) (*Decision, error) {
 	if !ok {
 		boolVal, ok := results[0].Expressions[0].Value.(bool)
 		if ok {
+			if boolVal {
+				metrics.PolicyResults.WithLabelValues("allow").Inc()
+			} else {
+				metrics.PolicyResults.WithLabelValues("deny").Inc()
+			}
 			return &Decision{Allowed: boolVal}, nil
 		}
+		metrics.PolicyResults.WithLabelValues("allow").Inc()
 		return &Decision{Allowed: true}, nil
 	}
 
@@ -110,11 +120,13 @@ func (e *Engine) Evaluate(ctx context.Context, input Input) (*Decision, error) {
 	}
 
 	if allowed {
+		metrics.PolicyResults.WithLabelValues("allow").Inc()
 		return &Decision{Allowed: true}, nil
 	}
 
 	if reason == "" {
 		reason = "denied by policy"
 	}
+	metrics.PolicyResults.WithLabelValues("deny").Inc()
 	return &Decision{Allowed: false, Reason: reason}, nil
 }

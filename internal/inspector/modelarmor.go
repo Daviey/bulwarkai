@@ -51,21 +51,21 @@ func (m *modelArmorInspector) sanitize(ctx context.Context, action, dataKey, tex
 	body, _ := json.Marshal(map[string]interface{}{dataKey: map[string]string{"text": text}})
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
-		return nil
+		return &BlockResult{Err: err}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := m.client.Do(req)
 	if err != nil {
-		return nil
+		return &BlockResult{Err: err}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil
+		return &BlockResult{Err: fmt.Errorf("model armor returned %d", resp.StatusCode)}
 	}
 	var result map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil
+		return &BlockResult{Err: err}
 	}
 	sr, _ := result["sanitizationResult"].(map[string]interface{})
 	if sr == nil || sr["invocationResult"] != "SUCCESS" || sr["filterMatchState"] != "MATCH_FOUND" {
