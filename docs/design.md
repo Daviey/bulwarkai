@@ -13,6 +13,7 @@ graph LR
     subgraph Bulwarkai [Bulwarkai - Cloud Run]
         AUTH[1. Authenticate]
         UA[2. User-Agent check]
+        POL[2.5. Policy check]
         EXT[3. Extract prompt]
         INSP[4. Inspector chain]
         TR[5. Translate to Gemini]
@@ -24,9 +25,10 @@ graph LR
     OC -->|TLS| AUTH
     CC -->|TLS| AUTH
     CU -->|TLS| AUTH
-    AUTH --> UA --> EXT --> INSP --> TR --> VC
+    AUTH --> UA --> POL --> EXT --> INSP --> TR --> VC
     VC --> INSR --> TR2
 
+    POL -.->|rego eval| OPA[OPA Engine]
     INSP -.->|sanitize API| MA[Model Armor]
     VC -.->|generateContent| VA[Vertex AI]
     INSP -.->|content:inspect| DLP[Cloud DLP]
@@ -129,6 +131,16 @@ The service accepts two authentication methods:
 
 All authentication requires the email domain to be in `ALLOWED_DOMAINS`.
 
+## Policy Engine (OPA)
+
+When enabled via `OPA_ENABLED=true`, an embedded Open Policy Agent evaluates access control decisions after authentication but before content inspection. The policy engine receives the caller email, requested model, streaming flag, and request path. It never sees prompt or response text.
+
+The policy is loaded at startup from `OPA_POLICY_FILE` (file path on disk) or inline Rego content via `OPA_POLICY_URL`. If neither is set, a permissive default policy (`allow := true`) is used.
+
+Evaluation is synchronous and in-process using the `rego` package. A typical policy evaluation takes under 100 microseconds. On evaluation errors, the engine fails open and logs the error.
+
+Pipeline position: auth, then policy engine, then inspector chain, then Vertex AI.
+
 ## Request Flow
 
 ### Anthropic Messages API (`POST /v1/messages`)
@@ -172,6 +184,9 @@ All configuration is through environment variables.
 | `DLP_INFO_TYPES` | `US_SOCIAL_SECURITY_NUMBER,CREDIT_CARD_NUMBER,...` | DLP info types to detect |
 | `DLP_MIN_LIKELIHOOD` | `LIKELY` | Minimum DLP finding likelihood |
 | `DLP_LOCATION` | (uses `GOOGLE_CLOUD_LOCATION`) | DLP API location |
+| `OPA_ENABLED` | (empty) | Set to `true` to enable the OPA policy engine |
+| `OPA_POLICY_FILE` | (empty) | Path to a Rego policy file on disk |
+| `OPA_POLICY_URL` | (empty) | Inline Rego policy content (reserved for future GCS bundle support) |
 | `PORT` | `8080` | HTTP listen port |
 | `LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LOG_PROMPT_MODE` | `truncate` | How prompts appear in logs: `truncate` (first 32 chars), `hash` (SHA-256 prefix), `full`, `none` |
@@ -270,7 +285,7 @@ The service never stores tokens. Bearer tokens are used for the duration of the 
 
 ### Inspector Fail-Open Semantics
 
-When an inspector cannot reach its backend (Model Armor, DLP), it returns nil (pass) rather than blocking the request. This is a conscious decision: the cost of blocking all AI traffic during a DLP outage exceeds the cost of an unscreened request. The `strict` mode's use of non-streaming calls means Model Armor's Vertex AI integration still provides a baseline enforcement even when the standalone API is down.
+When an inspector cannot reach its backend (Model Armor, DLP), it returns nil (pass) rather than blocking the request. This is a conscious decision: the cost of blocking all AI traffic during a DLP outage exceeds the cost of an unscreened request. The `strict` mode's use of non-streaming calls means Model Armor's Vertex AI integration still provides a baseline enforcement even when the standalone API is down. The OPA policy engine follows the same fail-open philosophy: a broken policy does not block all traffic.
 
 The Terraform configuration (`ignore_partial_invocation_failures = false`) adds a platform-level fail-closed override. When Model Armor itself is unavailable, the Vertex AI integration rejects the call rather than skipping sanitization. This is separate from the application-layer inspector behavior.
 

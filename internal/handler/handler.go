@@ -9,9 +9,11 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/Daviey/bulwarkai/internal/auth"
 	"github.com/Daviey/bulwarkai/internal/config"
 	"github.com/Daviey/bulwarkai/internal/inspector"
 	"github.com/Daviey/bulwarkai/internal/metrics"
+	"github.com/Daviey/bulwarkai/internal/policy"
 	"github.com/Daviey/bulwarkai/internal/vertex"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -35,10 +37,11 @@ type Server struct {
 	chain      inspector.Chain
 	vertex     vertex.VertexCaller
 	httpClient *http.Client
+	policy     *policy.Engine
 }
 
-func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client) *Server {
-	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient}
+func NewServer(cfg *config.Config, chain inspector.Chain, vc vertex.VertexCaller, httpClient *http.Client, eng *policy.Engine) *Server {
+	return &Server{cfg: cfg, chain: chain, vertex: vc, httpClient: httpClient, policy: eng}
 }
 
 func ctxLogger(ctx context.Context) *slog.Logger {
@@ -94,6 +97,28 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func (s *Server) checkPolicy(w http.ResponseWriter, r *http.Request, identity *auth.Identity, model string, stream bool) bool {
+	if s.policy == nil {
+		return true
+	}
+	dec, err := s.policy.Evaluate(r.Context(), policy.Input{
+		Email:  identity.Email,
+		Model:  model,
+		Stream: stream,
+		Path:   r.URL.Path,
+	})
+	if err != nil {
+		slog.Error("opa evaluate error", "error", err)
+		return true
+	}
+	if !dec.Allowed {
+		s.logAction("DENY_POLICY", model, "", dec.Reason, identity.Email)
+		http.Error(w, dec.Reason, http.StatusForbidden)
+		return false
+	}
+	return true
+}
+
 // @Summary Health check
 // @Description Returns service status and current screening mode
 // @Tags Health
@@ -101,7 +126,15 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 // @Success 200 {object} map[string]string
 // @Router /health [get]
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]string{"status": "ok", "mode": s.cfg.ResponseMode, "version": s.cfg.Version})
+	resp := map[string]string{
+		"status":  "ok",
+		"mode":    s.cfg.ResponseMode,
+		"version": s.cfg.Version,
+	}
+	if s.policy != nil {
+		resp["opa"] = "enabled"
+	}
+	writeJSON(w, resp)
 }
 
 // @Summary Readiness check

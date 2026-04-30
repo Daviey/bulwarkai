@@ -29,6 +29,7 @@ import (
 	"github.com/Daviey/bulwarkai/internal/config"
 	"github.com/Daviey/bulwarkai/internal/handler"
 	"github.com/Daviey/bulwarkai/internal/inspector"
+	"github.com/Daviey/bulwarkai/internal/policy"
 	"github.com/Daviey/bulwarkai/internal/vertex"
 )
 
@@ -60,6 +61,17 @@ func main() {
 	}
 	chain := inspector.NewChain(inspectors...)
 
+	var policyEngine *policy.Engine
+	if cfg.OPAEnabled {
+		pe, err := policy.NewEngine(context.Background(), true, cfg.OPAPolicyFile, cfg.OPAPolicyURL)
+		if err != nil {
+			slog.Error("opa init failed", "error", err)
+			os.Exit(1)
+		}
+		policyEngine = pe
+		slog.Info("opa policy engine enabled")
+	}
+
 	var caller vertex.VertexCaller
 	if cfg.DemoMode {
 		caller = vertex.NewDemoClient(cfg)
@@ -67,7 +79,7 @@ func main() {
 	} else {
 		caller = vertex.NewClient(cfg, httpClient)
 	}
-	server := handler.NewServer(cfg, chain, caller, httpClient)
+	server := handler.NewServer(cfg, chain, caller, httpClient, policyEngine)
 
 	slog.Info("bulwarkai starting", "version", version, "mode", cfg.ResponseMode, "inspectors", chain.Names(), "template", cfg.ModelArmorTemplate, "model", cfg.FallbackGeminiModel, "local", cfg.LocalMode, "demo", cfg.DemoMode)
 

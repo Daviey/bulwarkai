@@ -66,6 +66,10 @@ func (s *Server) handleVertexCompat(w http.ResponseWriter, r *http.Request, mode
 
 	wasStreaming := strings.Contains(action, "stream")
 
+	if !s.checkPolicy(w, r, identity, model, wasStreaming) {
+		return
+	}
+
 	var body map[string]interface{}
 	if !parseBody(w, r, &body) {
 		return

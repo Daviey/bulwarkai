@@ -91,6 +91,7 @@ func TestLoad_Defaults(t *testing.T) {
 		"GOOGLE_CLOUD_PROJECT", "GOOGLE_CLOUD_LOCATION", "ALLOWED_DOMAINS",
 		"RESPONSE_MODE", "MODEL_ARMOR_TEMPLATE", "LOCAL_MODE", "DEMO_MODE",
 		"PORT", "LOG_LEVEL", "LOG_PROMPT_MODE", "API_KEYS", "USER_AGENT_REGEX",
+		"OPA_ENABLED", "OPA_POLICY_FILE", "OPA_POLICY_URL",
 	} {
 		os.Unsetenv(k)
 	}
@@ -204,5 +205,26 @@ func TestRedactPrompt(t *testing.T) {
 	got = (&Config{LogPromptMode: "truncate"}).RedactPrompt("")
 	if got != "" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestLoad_OPADisabled(t *testing.T) {
+	cfg := Load()
+	if cfg.OPAEnabled {
+		t.Fatal("OPA should be disabled by default")
+	}
+}
+
+func TestLoad_OPAEnabled(t *testing.T) {
+	os.Setenv("OPA_ENABLED", "true")
+	os.Setenv("OPA_POLICY_FILE", "/etc/bulwarkai/policy.rego")
+	defer os.Unsetenv("OPA_ENABLED")
+	defer os.Unsetenv("OPA_POLICY_FILE")
+	cfg := Load()
+	if !cfg.OPAEnabled {
+		t.Fatal("expected OPA enabled")
+	}
+	if cfg.OPAPolicyFile != "/etc/bulwarkai/policy.rego" {
+		t.Fatalf("got %q", cfg.OPAPolicyFile)
 	}
 }

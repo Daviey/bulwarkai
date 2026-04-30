@@ -53,6 +53,14 @@ Model Armor is loaded as an inspector when `MODEL_ARMOR_TEMPLATE` is non-empty a
 | `DLP_MIN_LIKELIHOOD` | string | `LIKELY` | Minimum likelihood for DLP findings. Findings below this threshold are ignored. Options: `VERY_UNLIKELY`, `UNLIKELY`, `POSSIBLE`, `LIKELY`, `VERY_LIKELY`. |
 | `DLP_ENDPOINT` | string | `https://dlp.googleapis.com` | Override for the DLP API base URL. Primarily used for testing with a mock server. |
 
+## Policy Engine (OPA)
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `OPA_ENABLED` | string | unset | Set to `"true"` to enable the OPA policy engine. Any other value (or unset) disables it. |
+| `OPA_POLICY_FILE` | string | none | Path to a Rego policy file on disk. Loaded at startup. If not set, falls back to the default permissive policy. |
+| `OPA_POLICY_URL` | string | none | Inline Rego policy content. Reserved for future GCS bundle support. If not set, falls back to the default permissive policy. |
+
 ## Authentication
 
 | Variable | Type | Default | Description |
@@ -80,13 +88,15 @@ Model Armor is loaded as an inspector when `MODEL_ARMOR_TEMPLATE` is non-empty a
 
 ## Inspector Loading
 
-Inspectors are loaded at startup based on configuration. The chain runs in this order:
+The full pipeline runs in this order:
 
-1. Regex inspector: always loaded, cannot be disabled.
-2. Model Armor inspector: loaded when `MODEL_ARMOR_TEMPLATE` is non-empty and `RESPONSE_MODE` is not `strict`.
-3. DLP inspector: loaded when `DLP_API` is `"true"`.
+1. Authentication (domain check, JWT validation, API key)
+2. Policy engine (OPA, if enabled): access control based on identity and model
+3. Regex inspector: always loaded, cannot be disabled
+4. Model Armor inspector: loaded when `MODEL_ARMOR_TEMPLATE` is non-empty and `RESPONSE_MODE` is not `strict`
+5. DLP inspector: loaded when `DLP_API` is `"true"`
 
-The chain stops at the first inspector that returns a block result.
+The inspector chain stops at the first block result.
 
 ## Disabling Features
 
@@ -96,6 +106,7 @@ The chain stops at the first inspector that returns a block result.
 | User-Agent filtering | Leave `USER_AGENT_REGEX` empty |
 | Model Armor (fast/audit mode) | Set `MODEL_ARMOR_TEMPLATE` to an empty string |
 | DLP | Leave `DLP_API` unset or set to anything other than `"true"` |
+| OPA policy engine | Leave `OPA_ENABLED` unset or set to anything other than `"true"` |
 | All authentication | Set `LOCAL_MODE=true` (development only) |
 
 Note: Model Armor cannot be disabled in strict mode because it is enforced by Vertex AI's `generateContent` endpoint, not by the Bulwarkai inspector chain.

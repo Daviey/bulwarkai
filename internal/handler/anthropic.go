@@ -42,6 +42,11 @@ func (s *Server) ServeAnthropic(w http.ResponseWriter, r *http.Request) {
 		isStream = v
 	}
 	model := translate.StrVal(body["model"], s.cfg.FallbackGeminiModel)
+
+	if !s.checkPolicy(w, r, identity, model, isStream) {
+		return
+	}
+
 	prompt := translate.ExtractAnthropicPrompt(body)
 
 	br := s.chain.ScreenPrompt(r.Context(), prompt, identity.AccessToken)
