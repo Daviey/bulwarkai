@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -69,26 +68,22 @@ func (d *dlpInspector) inspect(ctx context.Context, text, token string) *BlockRe
 	url := fmt.Sprintf("%s/v2/projects/%s/locations/%s/content:inspect", d.endpoint, d.project, d.location)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
-		slog.Error("dlp request error", "error", err)
-		return nil
+		return &BlockResult{Err: err}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := d.client.Do(req)
 	if err != nil {
-		slog.Error("dlp call error", "error", err)
-		return nil
+		return &BlockResult{Err: err}
 	}
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		slog.Warn("dlp non-ok response", "status", resp.StatusCode, "body", string(data[:min(len(data), 200)]))
-		return nil
+		return &BlockResult{Err: fmt.Errorf("dlp returned %d", resp.StatusCode)}
 	}
 	var result map[string]interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
-		slog.Error("dlp response decode error", "error", err)
-		return nil
+		return &BlockResult{Err: err}
 	}
 	findings, _ := result["result"].(map[string]interface{})["findings"].([]interface{})
 	if len(findings) == 0 {

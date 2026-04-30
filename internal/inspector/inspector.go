@@ -12,6 +12,7 @@ import (
 type BlockResult struct {
 	Blocked bool
 	Reason  string
+	Err     error
 }
 
 type Inspector interface {
@@ -75,6 +76,13 @@ func (c Chain) runConcurrently(ctx context.Context, direction, text, token strin
 			result := fn(i, ctx, text, token)
 			dur := time.Since(start)
 			metrics.InspectorDuration.WithLabelValues(i.Name(), direction).Observe(dur.Seconds())
+			if result != nil && result.Blocked {
+				metrics.InspectorResults.WithLabelValues(i.Name(), direction, "block").Inc()
+			} else if result != nil && result.Err != nil {
+				metrics.InspectorResults.WithLabelValues(i.Name(), direction, "error").Inc()
+			} else {
+				metrics.InspectorResults.WithLabelValues(i.Name(), direction, "pass").Inc()
+			}
 			ch <- screenResult{
 				inspector: i.Name(),
 				result:    result,
@@ -90,7 +98,7 @@ func (c Chain) runConcurrently(ctx context.Context, direction, text, token strin
 
 	var blockResult *BlockResult
 	for sr := range ch {
-		if sr.result != nil {
+		if sr.result != nil && sr.result.Blocked {
 			slog.Warn("inspector blocked",
 				"direction", direction,
 				"inspector", sr.inspector,
@@ -100,6 +108,13 @@ func (c Chain) runConcurrently(ctx context.Context, direction, text, token strin
 			if blockResult == nil {
 				blockResult = sr.result
 			}
+		} else if sr.result != nil && sr.result.Err != nil {
+			slog.Error("inspector error (fail-open)",
+				"direction", direction,
+				"inspector", sr.inspector,
+				"error", sr.result.Err,
+				"duration_ms", sr.duration.Milliseconds(),
+			)
 		} else {
 			slog.Debug("inspector passed",
 				"direction", direction,
