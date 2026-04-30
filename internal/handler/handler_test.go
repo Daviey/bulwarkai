@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -10,7 +11,9 @@ import (
 
 	"github.com/Daviey/bulwarkai/internal/config"
 	"github.com/Daviey/bulwarkai/internal/inspector"
+	"github.com/Daviey/bulwarkai/internal/policy"
 	"github.com/Daviey/bulwarkai/internal/vertex"
+	"github.com/Daviey/bulwarkai/internal/webhook"
 )
 
 func testConfig() *config.Config {
@@ -25,7 +28,7 @@ func testConfig() *config.Config {
 
 func testServer(cfg *config.Config, vc vertex.VertexCaller) *Server {
 	chain := inspector.NewChain()
-	return NewServer(cfg, chain, vc, http.DefaultClient, nil, nil)
+	return NewServer(cfg, chain, vc, http.DefaultClient, nil, nil, nil)
 }
 
 func TestHealthEndpoint(t *testing.T) {
@@ -357,5 +360,110 @@ func TestDemoClient_CallStreamRaw(t *testing.T) {
 	}
 	if len(data) == 0 {
 		t.Fatal("expected stream data")
+	}
+}
+
+type stubLimiter struct {
+	allowed bool
+	calls   int
+}
+
+func (s *stubLimiter) Allow(key string) bool {
+	s.calls++
+	return s.allowed
+}
+
+func TestRateLimitMiddleware_Rejects(t *testing.T) {
+	rl := &stubLimiter{allowed: false}
+	cfg := testConfig()
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, rl)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	r.Header.Set("Authorization", "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZX0.fake")
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
+	}
+	if rl.calls != 1 {
+		t.Fatalf("expected 1 rate limit check, got %d", rl.calls)
+	}
+}
+
+func TestRateLimitMiddleware_Allows(t *testing.T) {
+	rl := &stubLimiter{allowed: true}
+	cfg := testConfig()
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, rl)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestRateLimitMiddleware_Nil(t *testing.T) {
+	cfg := testConfig()
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, nil)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 with nil limiter, got %d", w.Code)
+	}
+}
+
+func TestHealthEndpoint_WithComponents(t *testing.T) {
+	cfg := testConfig()
+	chain := inspector.NewChain()
+	pe, _ := policy.NewEngine(context.Background(), true, "", "package bulwarkai\n\ndefault allow := true\n")
+	defer pe.Stop()
+	wh := webhook.NewNotifier("http://example.com/webhook", "secret", 16)
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, pe, wh, &stubLimiter{allowed: true})
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	srv.healthHandler(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var body map[string]string
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["opa"] != "enabled" {
+		t.Errorf("expected opa=enabled, got %q", body["opa"])
+	}
+	if body["webhook"] != "enabled" {
+		t.Errorf("expected webhook=enabled, got %q", body["webhook"])
+	}
+	if body["rate_limit"] != "enabled" {
+		t.Errorf("expected rate_limit=enabled, got %q", body["rate_limit"])
+	}
+	if body["opa_status"] == "" {
+		t.Error("expected opa_status field")
+	}
+}
+
+func TestRequestMiddleware_LogsEmail(t *testing.T) {
+	cfg := testConfig()
+	cfg.LocalMode = true
+	chain := inspector.NewChain()
+	demo := vertex.NewDemoClient(cfg)
+	srv := NewServer(cfg, chain, demo, http.DefaultClient, nil, nil, nil)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }

@@ -13,7 +13,7 @@ info:
 paths:
   /health:
     get:
-      description: Returns service status and current screening mode
+      description: Returns service status, screening mode, and component health
       produces:
       - application/json
       responses:
