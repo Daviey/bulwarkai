@@ -115,6 +115,12 @@ func (b *Breaker) State() State {
 	return b.state
 }
 
+func (b *Breaker) Failures() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.failures
+}
+
 func (b *Breaker) Execute(ctx context.Context, fn func(ctx context.Context) error) error {
 	if err := b.Allow(); err != nil {
 		return err

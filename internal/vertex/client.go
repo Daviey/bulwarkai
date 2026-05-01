@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,23 @@ import (
 
 	"golang.org/x/oauth2/google"
 )
+
+type VertexError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *VertexError) Error() string {
+	return fmt.Sprintf("vertex returned %d: %s", e.StatusCode, e.Body)
+}
+
+func newVertexError(statusCode int, body string) *VertexError {
+	b := body
+	if len(b) > 500 {
+		b = b[:500]
+	}
+	return &VertexError{StatusCode: statusCode, Body: b}
+}
 
 type Client struct {
 	cfg          *config.Config
@@ -74,6 +92,13 @@ func (c *Client) BreakerState() string {
 	return c.breaker.State().String()
 }
 
+func (c *Client) BreakerInfo() map[string]interface{} {
+	return map[string]interface{}{
+		"state":    c.breaker.State().String(),
+		"failures": c.breaker.Failures(),
+	}
+}
+
 func (c *Client) resolveToken(accessToken string) string {
 	if accessToken != "" {
 		return accessToken
@@ -98,7 +123,9 @@ func (c *Client) CallStreamRaw(ctx context.Context, body map[string]interface{},
 	}
 	rc, err := c.callStreamRaw(ctx, body, accessToken, model, action)
 	if err != nil {
-		c.breaker.RecordFailure()
+		if shouldTripBreaker(err) {
+			c.breaker.RecordFailure()
+		}
 		return nil, err
 	}
 	c.breaker.RecordSuccess()
@@ -123,9 +150,9 @@ func (c *Client) callStreamRaw(ctx context.Context, body map[string]interface{},
 		data, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("vertex returned %d (body read failed: %s)", resp.StatusCode, readErr)
+			return nil, newVertexError(resp.StatusCode, readErr.Error())
 		}
-		return nil, fmt.Errorf("vertex returned %d: %s", resp.StatusCode, string(data[:min(len(data), 500)]))
+		return nil, newVertexError(resp.StatusCode, string(data))
 	}
 	return resp.Body, nil
 }
@@ -136,7 +163,9 @@ func (c *Client) CallJSONForModel(ctx context.Context, body map[string]interface
 	}
 	data, err := c.callJSONForModel(ctx, body, accessToken, model, streaming)
 	if err != nil {
-		c.breaker.RecordFailure()
+		if shouldTripBreaker(err) {
+			c.breaker.RecordFailure()
+		}
 		return nil, err
 	}
 	c.breaker.RecordSuccess()
@@ -160,7 +189,7 @@ func (c *Client) callJSONForModel(ctx context.Context, body map[string]interface
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("vertex returned %d: %s", resp.StatusCode, string(data[:min(len(data), 500)]))
+		return nil, newVertexError(resp.StatusCode, string(data))
 	}
 	return data, nil
 }
@@ -171,7 +200,9 @@ func (c *Client) CallJSON(ctx context.Context, body map[string]interface{}, acce
 	}
 	data, err := c.callJSON(ctx, body, accessToken, streaming)
 	if err != nil {
-		c.breaker.RecordFailure()
+		if shouldTripBreaker(err) {
+			c.breaker.RecordFailure()
+		}
 		return nil, err
 	}
 	c.breaker.RecordSuccess()
@@ -195,7 +226,7 @@ func (c *Client) callJSON(ctx context.Context, body map[string]interface{}, acce
 	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("vertex returned %d: %s", resp.StatusCode, string(data[:min(len(data), 500)]))
+		return nil, newVertexError(resp.StatusCode, string(data))
 	}
 	return data, nil
 }
@@ -206,11 +237,21 @@ func (c *Client) CallStream(ctx context.Context, body map[string]interface{}, ac
 	}
 	rc, err := c.callStream(ctx, body, accessToken)
 	if err != nil {
-		c.breaker.RecordFailure()
+		if shouldTripBreaker(err) {
+			c.breaker.RecordFailure()
+		}
 		return nil, err
 	}
 	c.breaker.RecordSuccess()
 	return rc, nil
+}
+
+func shouldTripBreaker(err error) bool {
+	var ve *VertexError
+	if errors.As(err, &ve) {
+		return ve.StatusCode >= 500 || ve.StatusCode == 0
+	}
+	return true
 }
 
 func (c *Client) callStream(ctx context.Context, body map[string]interface{}, accessToken string) (io.ReadCloser, error) {
@@ -231,9 +272,9 @@ func (c *Client) callStream(ctx context.Context, body map[string]interface{}, ac
 		data, readErr := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		if readErr != nil {
-			return nil, fmt.Errorf("vertex returned %d (body read failed: %s)", resp.StatusCode, readErr)
+			return nil, newVertexError(resp.StatusCode, readErr.Error())
 		}
-		return nil, fmt.Errorf("vertex returned %d: %s", resp.StatusCode, string(data[:min(len(data), 500)]))
+		return nil, newVertexError(resp.StatusCode, string(data))
 	}
 	return resp.Body, nil
 }

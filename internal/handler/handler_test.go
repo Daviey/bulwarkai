@@ -40,7 +40,7 @@ func TestHealthEndpoint(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("got %d", w.Code)
 	}
-	var body map[string]string
+	var body map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&body)
 	if body["status"] != "ok" {
 		t.Fatalf("got %q", body["status"])
@@ -455,10 +455,11 @@ func TestHealthEndpoint_WithComponents(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var body map[string]string
+	var body map[string]interface{}
 	json.NewDecoder(w.Body).Decode(&body)
-	if body["opa"] != "enabled" {
-		t.Errorf("expected opa=enabled, got %q", body["opa"])
+	opa, ok := body["opa"].(map[string]interface{})
+	if !ok || opa["status"] != "enabled" {
+		t.Errorf("expected opa.status=enabled, got %v", body["opa"])
 	}
 	if body["webhook"] != "enabled" {
 		t.Errorf("expected webhook=enabled, got %q", body["webhook"])
@@ -466,8 +467,8 @@ func TestHealthEndpoint_WithComponents(t *testing.T) {
 	if body["rate_limit"] != "enabled" {
 		t.Errorf("expected rate_limit=enabled, got %q", body["rate_limit"])
 	}
-	if body["opa_status"] == "" {
-		t.Error("expected opa_status field")
+	if opa["info"] == nil || opa["info"] == "" {
+		t.Error("expected opa.info field")
 	}
 }
 
