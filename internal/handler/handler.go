@@ -189,6 +189,9 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	if s.rateLimiter != nil {
 		resp["rate_limit"] = "enabled"
 	}
+	if vc, ok := s.vertex.(*vertex.Client); ok && vc != nil {
+		resp["circuit_breaker"] = vc.BreakerState()
+	}
 	writeJSON(w, resp)
 }
 

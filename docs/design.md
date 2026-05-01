@@ -173,6 +173,20 @@ Notifications are sent from a buffered queue (256 events). If the queue is full,
 
 The webhook client sets a `Content-Type: application/json` header and optionally an `X-Webhook-Secret` header (when `WEBHOOK_SECRET` is configured). The client has a 10-second timeout per request. Server errors (5xx) and network errors trigger up to 3 retries with exponential backoff (500ms base, 2x factor, 10s cap). Client errors (4xx) are not retried.
 
+## Circuit Breaker
+
+The Vertex AI client wraps all outbound calls in a circuit breaker. When 5 consecutive calls fail (network error, timeout, or non-200 response), the breaker opens. Open-circuit requests are rejected immediately with a clear error, skipping JSON parsing, inspector evaluation, and the HTTP round-trip.
+
+After 30 seconds in the open state, the breaker transitions to half-open and allows a single probe request. A successful probe closes the circuit. A failed probe reopens it.
+
+The breaker state is exposed in the `/health` endpoint (`circuit_breaker` field) and as the `bulwarkai_circuit_breaker_state` Prometheus gauge. The state values are: 1 (closed), 0.5 (half-open), 0 (open).
+
+## CORS
+
+## CORS
+
+When `CORS_ORIGIN` is set, the service adds `Access-Control-Allow-Origin` and related headers to all responses. OPTIONS preflight requests receive a 204 No Content response with `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, and `Access-Control-Max-Age` headers.
+
 ## Request Flow
 
 ### Anthropic Messages API (`POST /v1/messages`)
@@ -223,6 +237,7 @@ All configuration is through environment variables.
 | `RATE_LIMIT_WINDOW` | `1m` | Rate limit time window (Go duration) |
 | `WEBHOOK_URL` | (empty) | URL for block event notifications |
 | `WEBHOOK_SECRET` | (empty) | Secret token for webhook verification |
+| `CORS_ORIGIN` | (empty) | Access-Control-Allow-Origin value. Empty disables CORS. |
 | `PORT` | `8080` | HTTP listen port |
 | `LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LOG_PROMPT_MODE` | `truncate` | How prompts appear in logs: `truncate` (first 32 chars), `hash` (SHA-256 prefix), `full`, `none` |

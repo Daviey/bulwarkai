@@ -8,7 +8,9 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/Daviey/bulwarkai/internal/circuitbreaker"
 	"github.com/Daviey/bulwarkai/internal/config"
 
 	"golang.org/x/oauth2/google"
@@ -18,12 +20,14 @@ type Client struct {
 	cfg          *config.Config
 	httpClient   *http.Client
 	adcTokenFunc func() string
+	breaker      *circuitbreaker.Breaker
 }
 
 func NewClient(cfg *config.Config, httpClient *http.Client) *Client {
 	c := &Client{
 		cfg:        cfg,
 		httpClient: httpClient,
+		breaker:    circuitbreaker.NewBreaker("vertex-ai", 5, 30*time.Second),
 	}
 	if cfg.LocalMode {
 		c.initADC()
@@ -53,6 +57,10 @@ func (c *Client) SetADCTokenFunc(f func() string) {
 	c.adcTokenFunc = f
 }
 
+func (c *Client) BreakerState() string {
+	return c.breaker.State().String()
+}
+
 func (c *Client) resolveToken(accessToken string) string {
 	if accessToken != "" {
 		return accessToken
@@ -72,6 +80,19 @@ func (c *Client) buildVertexURL(streaming bool) string {
 }
 
 func (c *Client) CallStreamRaw(ctx context.Context, body map[string]interface{}, accessToken, model, action string) (io.ReadCloser, error) {
+	if err := c.breaker.Allow(); err != nil {
+		return nil, err
+	}
+	rc, err := c.callStreamRaw(ctx, body, accessToken, model, action)
+	if err != nil {
+		c.breaker.RecordFailure()
+		return nil, err
+	}
+	c.breaker.RecordSuccess()
+	return rc, nil
+}
+
+func (c *Client) callStreamRaw(ctx context.Context, body map[string]interface{}, accessToken, model, action string) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%s/publishers/google/models/%s:%s", c.cfg.VertexBase, model, action)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -97,6 +118,19 @@ func (c *Client) CallStreamRaw(ctx context.Context, body map[string]interface{},
 }
 
 func (c *Client) CallJSONForModel(ctx context.Context, body map[string]interface{}, accessToken, model string, streaming bool) ([]byte, error) {
+	if err := c.breaker.Allow(); err != nil {
+		return nil, err
+	}
+	data, err := c.callJSONForModel(ctx, body, accessToken, model, streaming)
+	if err != nil {
+		c.breaker.RecordFailure()
+		return nil, err
+	}
+	c.breaker.RecordSuccess()
+	return data, nil
+}
+
+func (c *Client) callJSONForModel(ctx context.Context, body map[string]interface{}, accessToken, model string, streaming bool) ([]byte, error) {
 	url := fmt.Sprintf("%s/publishers/google/models/%s:generateContent", c.cfg.VertexBase, model)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -119,6 +153,19 @@ func (c *Client) CallJSONForModel(ctx context.Context, body map[string]interface
 }
 
 func (c *Client) CallJSON(ctx context.Context, body map[string]interface{}, accessToken string, streaming bool) ([]byte, error) {
+	if err := c.breaker.Allow(); err != nil {
+		return nil, err
+	}
+	data, err := c.callJSON(ctx, body, accessToken, streaming)
+	if err != nil {
+		c.breaker.RecordFailure()
+		return nil, err
+	}
+	c.breaker.RecordSuccess()
+	return data, nil
+}
+
+func (c *Client) callJSON(ctx context.Context, body map[string]interface{}, accessToken string, streaming bool) ([]byte, error) {
 	url := c.buildVertexURL(streaming)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -141,6 +188,19 @@ func (c *Client) CallJSON(ctx context.Context, body map[string]interface{}, acce
 }
 
 func (c *Client) CallStream(ctx context.Context, body map[string]interface{}, accessToken string) (io.ReadCloser, error) {
+	if err := c.breaker.Allow(); err != nil {
+		return nil, err
+	}
+	rc, err := c.callStream(ctx, body, accessToken)
+	if err != nil {
+		c.breaker.RecordFailure()
+		return nil, err
+	}
+	c.breaker.RecordSuccess()
+	return rc, nil
+}
+
+func (c *Client) callStream(ctx context.Context, body map[string]interface{}, accessToken string) (io.ReadCloser, error) {
 	url := c.buildVertexURL(true)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
