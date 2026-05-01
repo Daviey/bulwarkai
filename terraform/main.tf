@@ -114,6 +114,12 @@ variable "webhook_secret" {
   sensitive   = true
 }
 
+variable "cors_origin" {
+  description = "CORS Access-Control-Allow-Origin value. Empty disables CORS headers."
+  type        = string
+  default     = ""
+}
+
 locals {
   service_name = "bulwarkai"
   sa_name      = "bulwarkai"

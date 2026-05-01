@@ -122,6 +122,13 @@ resource "google_cloud_run_v2_service" "bulwarkai" {
           value = env.value
         }
       }
+      dynamic "env" {
+        for_each = var.cors_origin != "" ? [var.cors_origin] : []
+        content {
+          name  = "CORS_ORIGIN"
+          value = env.value
+        }
+      }
 
       resources {
         limits = {

@@ -48,4 +48,9 @@ var (
 		Name: "bulwarkai_rate_limit_exceeded_total",
 		Help: "Rate limit exceeded events",
 	}, []string{"email"})
+
+	CircuitBreakerState = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "bulwarkai_circuit_breaker_state",
+		Help: "Circuit breaker state: 1=closed, 0.5=half-open, 0=open",
+	}, []string{"breaker"})
 )
