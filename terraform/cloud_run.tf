@@ -129,6 +129,18 @@ resource "google_cloud_run_v2_service" "bulwarkai" {
           value = env.value
         }
       }
+      env {
+        name  = "MAX_BODY_SIZE"
+        value = tostring(var.max_body_size)
+      }
+      env {
+        name  = "CB_MAX_FAILURES"
+        value = tostring(var.cb_max_failures)
+      }
+      env {
+        name  = "CB_RESET_TIMEOUT"
+        value = var.cb_reset_timeout
+      }
 
       resources {
         limits = {

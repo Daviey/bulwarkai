@@ -33,7 +33,7 @@ func (s *Server) ServeOpenAI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body map[string]interface{}
-	if !parseBody(w, r, &body) {
+	if !s.parseBody(w, r, &body) {
 		return
 	}
 

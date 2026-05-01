@@ -284,3 +284,30 @@ func TestEnvInt(t *testing.T) {
 		t.Fatalf("got %d", got)
 	}
 }
+
+func TestLoad_MaxBodySize(t *testing.T) {
+	os.Setenv("MAX_BODY_SIZE", "1048576")
+	defer os.Unsetenv("MAX_BODY_SIZE")
+	cfg := Load()
+	if cfg.MaxBodySize != 1048576 {
+		t.Fatalf("got %d", cfg.MaxBodySize)
+	}
+}
+
+func TestLoad_CBMaxFailures(t *testing.T) {
+	os.Setenv("CB_MAX_FAILURES", "10")
+	defer os.Unsetenv("CB_MAX_FAILURES")
+	cfg := Load()
+	if cfg.CBMaxFailures != 10 {
+		t.Fatalf("got %d", cfg.CBMaxFailures)
+	}
+}
+
+func TestLoad_CBResetTimeout(t *testing.T) {
+	os.Setenv("CB_RESET_TIMEOUT", "60s")
+	defer os.Unsetenv("CB_RESET_TIMEOUT")
+	cfg := Load()
+	if cfg.CBResetTimeout != "60s" {
+		t.Fatalf("got %q", cfg.CBResetTimeout)
+	}
+}

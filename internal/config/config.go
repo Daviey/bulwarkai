@@ -37,6 +37,9 @@ type Config struct {
 	WebhookURL          string
 	WebhookSecret       string
 	CORSOrigin          string
+	MaxBodySize         int
+	CBMaxFailures       int
+	CBResetTimeout      string
 }
 
 func Load() *Config {
@@ -66,6 +69,9 @@ func Load() *Config {
 		WebhookURL:          EnvOr("WEBHOOK_URL", ""),
 		WebhookSecret:       EnvOr("WEBHOOK_SECRET", ""),
 		CORSOrigin:          EnvOr("CORS_ORIGIN", ""),
+		MaxBodySize:         EnvInt("MAX_BODY_SIZE", 10*1024*1024),
+		CBMaxFailures:       EnvInt("CB_MAX_FAILURES", 5),
+		CBResetTimeout:      EnvOr("CB_RESET_TIMEOUT", "30s"),
 	}
 	c.ModelArmorEndpoint = "https://modelarmor." + c.ModelArmorLocation + ".rep.googleapis.com"
 	if ua := os.Getenv("USER_AGENT_REGEX"); ua != "" {

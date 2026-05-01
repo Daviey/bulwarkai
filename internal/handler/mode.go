@@ -64,12 +64,15 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	}
 }
 
-func parseBody(w http.ResponseWriter, r *http.Request, target interface{}) bool {
-	const maxBodySize = 10 * 1024 * 1024
+func (s *Server) parseBody(w http.ResponseWriter, r *http.Request, target interface{}) bool {
+	maxBodySize := int64(s.cfg.MaxBodySize)
+	if maxBodySize <= 0 {
+		maxBodySize = 10 * 1024 * 1024
+	}
 	lr := io.LimitReader(r.Body, maxBodySize+1)
 	if err := json.NewDecoder(lr).Decode(target); err != nil {
 		if err == io.ErrUnexpectedEOF || lr.(*io.LimitedReader).N <= 0 {
-			http.Error(w, "request body exceeds 10MB limit", http.StatusRequestEntityTooLarge)
+			http.Error(w, "request body exceeds size limit", http.StatusRequestEntityTooLarge)
 			return false
 		}
 		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)

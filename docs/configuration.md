@@ -98,6 +98,15 @@ The webhook payload is a JSON object with fields: `timestamp`, `action`, `model`
 
 When enabled, the service handles OPTIONS requests with a 204 No Content response and sets `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, and `Access-Control-Max-Age` headers.
 
+## Circuit Breaker
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `CB_MAX_FAILURES` | int | `5` | Number of consecutive Vertex AI failures before the circuit breaker opens. |
+| `CB_RESET_TIMEOUT` | string (Go duration) | `30s` | Time to wait before transitioning from open to half-open state. |
+
+When the circuit breaker is open, all Vertex AI calls are rejected immediately. This prevents slow timeouts from piling up when Vertex AI is degraded.
+
 ## Server
 
 | Variable | Type | Default | Description |
@@ -143,7 +152,7 @@ Note: Model Armor cannot be disabled in strict mode because it is enforced by Ve
 
 ## Request Size Limit
 
-The service enforces a 10 MB request body limit. Requests exceeding this are rejected with HTTP 413.
+The service enforces a configurable request body size limit via `MAX_BODY_SIZE` (default 10 MB). Requests exceeding this are rejected with HTTP 413.
 
 ## Example Configurations
 
