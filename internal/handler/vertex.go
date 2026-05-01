@@ -71,7 +71,7 @@ func (s *Server) handleVertexCompat(w http.ResponseWriter, r *http.Request, mode
 	}
 
 	var body map[string]interface{}
-	if !parseBody(w, r, &body) {
+	if !s.parseBody(w, r, &body) {
 		return
 	}
 

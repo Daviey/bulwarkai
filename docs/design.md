@@ -175,9 +175,9 @@ The webhook client sets a `Content-Type: application/json` header and optionally
 
 ## Circuit Breaker
 
-The Vertex AI client wraps all outbound calls in a circuit breaker. When 5 consecutive calls fail (network error, timeout, or non-200 response), the breaker opens. Open-circuit requests are rejected immediately with a clear error, skipping JSON parsing, inspector evaluation, and the HTTP round-trip.
+The Vertex AI client wraps all outbound calls in a circuit breaker. When `CB_MAX_FAILURES` consecutive calls fail (default 5, network error, timeout, or non-200 response), the breaker opens. Open-circuit requests are rejected immediately with a clear error, skipping JSON parsing, inspector evaluation, and the HTTP round-trip.
 
-After 30 seconds in the open state, the breaker transitions to half-open and allows a single probe request. A successful probe closes the circuit. A failed probe reopens it.
+After `CB_RESET_TIMEOUT` (default 30 seconds) in the open state, the breaker transitions to half-open and allows a single probe request. A successful probe closes the circuit. A failed probe reopens it.
 
 The breaker state is exposed in the `/health` endpoint (`circuit_breaker` field) and as the `bulwarkai_circuit_breaker_state` Prometheus gauge. The state values are: 1 (closed), 0.5 (half-open), 0 (open).
 
@@ -238,6 +238,9 @@ All configuration is through environment variables.
 | `WEBHOOK_URL` | (empty) | URL for block event notifications |
 | `WEBHOOK_SECRET` | (empty) | Secret token for webhook verification |
 | `CORS_ORIGIN` | (empty) | Access-Control-Allow-Origin value. Empty disables CORS. |
+| `MAX_BODY_SIZE` | `10485760` | Maximum request body size in bytes (default 10MB) |
+| `CB_MAX_FAILURES` | `5` | Circuit breaker: consecutive failures before opening |
+| `CB_RESET_TIMEOUT` | `30s` | Circuit breaker: time before half-open transition |
 | `PORT` | `8080` | HTTP listen port |
 | `LOG_LEVEL` | `info` | Log level (`info` or `debug`) |
 | `LOG_PROMPT_MODE` | `truncate` | How prompts appear in logs: `truncate` (first 32 chars), `hash` (SHA-256 prefix), `full`, `none` |

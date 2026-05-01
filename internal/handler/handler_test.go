@@ -159,10 +159,11 @@ func TestServeOpenAIModelDetail_NotFound(t *testing.T) {
 }
 
 func TestParseBody_Valid(t *testing.T) {
+	srv := testServer(testConfig(), nil)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/", strings.NewReader(`{"key":"value"}`))
 	var target map[string]string
-	if !parseBody(w, r, &target) {
+	if !srv.parseBody(w, r, &target) {
 		t.Fatal("expected true")
 	}
 	if target["key"] != "value" {
@@ -171,10 +172,11 @@ func TestParseBody_Valid(t *testing.T) {
 }
 
 func TestParseBody_InvalidJSON(t *testing.T) {
+	srv := testServer(testConfig(), nil)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/", strings.NewReader(`not json`))
 	var target map[string]string
-	if parseBody(w, r, &target) {
+	if srv.parseBody(w, r, &target) {
 		t.Fatal("expected false")
 	}
 	if w.Code != http.StatusBadRequest {
@@ -183,12 +185,29 @@ func TestParseBody_InvalidJSON(t *testing.T) {
 }
 
 func TestParseBody_TooLarge(t *testing.T) {
+	srv := testServer(testConfig(), nil)
 	big := `{"data": "` + strings.Repeat("x", 10*1024*1024+100) + `"}`
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/", strings.NewReader(big))
 	var target map[string]string
-	if parseBody(w, r, &target) {
+	if srv.parseBody(w, r, &target) {
 		t.Fatal("expected false")
+	}
+	if w.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("got %d", w.Code)
+	}
+}
+
+func TestParseBody_CustomMaxSize(t *testing.T) {
+	cfg := testConfig()
+	cfg.MaxBodySize = 100
+	srv := testServer(cfg, nil)
+	body := `{"data": "` + strings.Repeat("x", 200) + `"}`
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/", strings.NewReader(body))
+	var target map[string]string
+	if srv.parseBody(w, r, &target) {
+		t.Fatal("expected false for oversized body")
 	}
 	if w.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("got %d", w.Code)

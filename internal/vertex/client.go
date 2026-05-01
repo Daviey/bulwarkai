@@ -24,15 +24,28 @@ type Client struct {
 }
 
 func NewClient(cfg *config.Config, httpClient *http.Client) *Client {
+	cbFailures := cfg.CBMaxFailures
+	if cbFailures <= 0 {
+		cbFailures = 5
+	}
+	cbTimeout := parseDurationSafe(cfg.CBResetTimeout, 30*time.Second)
 	c := &Client{
 		cfg:        cfg,
 		httpClient: httpClient,
-		breaker:    circuitbreaker.NewBreaker("vertex-ai", 5, 30*time.Second),
+		breaker:    circuitbreaker.NewBreaker("vertex-ai", cbFailures, cbTimeout),
 	}
 	if cfg.LocalMode {
 		c.initADC()
 	}
 	return c
+}
+
+func parseDurationSafe(s string, def time.Duration) time.Duration {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return def
+	}
+	return d
 }
 
 func (c *Client) initADC() {

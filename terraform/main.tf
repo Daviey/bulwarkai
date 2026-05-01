@@ -120,6 +120,24 @@ variable "cors_origin" {
   default     = ""
 }
 
+variable "max_body_size" {
+  description = "Maximum request body size in bytes. Default 10MB."
+  type        = number
+  default     = 10485760
+}
+
+variable "cb_max_failures" {
+  description = "Circuit breaker: consecutive failures before opening. Default 5."
+  type        = number
+  default     = 5
+}
+
+variable "cb_reset_timeout" {
+  description = "Circuit breaker: time before transitioning from open to half-open (Go duration). Default 30s."
+  type        = string
+  default     = "30s"
+}
+
 locals {
   service_name = "bulwarkai"
   sa_name      = "bulwarkai"
