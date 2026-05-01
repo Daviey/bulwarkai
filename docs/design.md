@@ -314,7 +314,7 @@ Screening happens at three independent layers:
 
 Infrastructure controls provide additional isolation:
 
-4. VPC Service Controls perimeter around Vertex AI, Model Armor, and DLP prevents direct access to these services outside the proxy.
+4. VPC Service Controls perimeter around Vertex AI, Model Armor, and DLP prevents direct access to these services outside the proxy. Enabled via `vpc_sc_enabled = true` in Terraform.
 5. Binary Authorization requires attestation before Cloud Run accepts a container image.
 6. CMEK encryption on Artifact Registry and Cloud Run. Region-pinned Secret Manager replication.
 
@@ -387,8 +387,6 @@ The Go binary has direct dependencies on `google/uuid`, `anthropics/anthropic-sd
 
 The service runs in a Google-managed Cloud Run environment with Direct VPC Egress into a dedicated VPC and subnet. Outbound connections go to Vertex AI (`aiplatform.googleapis.com`), Model Armor (`modelarmor.europe-west2.rep.googleapis.com`), DLP (`dlp.googleapis.com`), and OAuth (`oauth2.googleapis.com`). All use HTTPS. No inbound connections are accepted other than through Cloud Run's load balancer, which is configured for internal-only ingress.
 
-A VPC Service Controls perimeter restricts Vertex AI, Model Armor, and DLP to this project. An ingress rule allows the Cloud Run VPC to reach these services. The Bulwarkai service account is the only identity permitted to call Vertex AI within the perimeter, preventing users from bypassing the proxy.
+A VPC Service Controls perimeter restricts Vertex AI, Model Armor, and DLP to this project. The perimeter is disabled by default and enabled by setting `vpc_sc_enabled = true` in `terraform.tfvars`. The ingress rule allows any identity from the Cloud Run VPC subnet, but blocks all access from outside it. This forces all traffic through the proxy while preserving user attribution: the proxy forwards the caller's OAuth token to Vertex AI, so audit logs still show which human made each request. Users cannot bypass the proxy because direct calls to Vertex AI from outside the VPC are rejected by the perimeter.
 
 Binary Authorization is enabled with an attestor, requiring signed container images before deployment. Artifact Registry and Cloud Run are both encrypted with CMEK keys. Secret Manager stores API keys with region-pinned replication and resource-level IAM bindings.
-
-A VPC Service Controls perimeter around Vertex AI is planned but not yet deployed. Once in place, the Bulwarkai's service account will be the only identity permitted to call Vertex AI within the perimeter, preventing users from bypassing the proxy.

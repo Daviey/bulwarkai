@@ -77,6 +77,12 @@ variable "allowed_iam_members" {
   default     = []
 }
 
+variable "vpc_sc_enabled" {
+  description = "Enable VPC Service Controls perimeter around Vertex AI, Model Armor, and DLP. Requires access_policy_name and org_id."
+  type        = bool
+  default     = false
+}
+
 variable "opa_enabled" {
   description = "Enable OPA policy engine"
   type        = bool
