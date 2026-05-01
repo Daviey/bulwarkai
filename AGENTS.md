@@ -1,75 +1,156 @@
 # AGENTS.md
 
+## Project
+
+Bulwarkai is an AI safety proxy that screens all traffic between client applications and Google Vertex AI for sensitive data and content policy violations. Written in Go 1.25, deployed to Cloud Run.
+
+**Repo**: `github.com/Daviey/bulwarkai` (public)
+**Module path**: `github.com/Daviey/bulwarkai`
+
 ## Commands
 
 ```bash
-make test          # Go tests with coverage (must pass before committing)
-make dev           # Run locally with `go run`
-make docs          # Regenerate swagger.yaml from handler annotations (swag init)
-make build         # Docker build (scratch image, CGO_ENABLED=0)
-make scan          # gosec + govulncheck
+make dev          # run locally
+make test         # run tests with coverage
+make test-html    # tests with HTML coverage report
+make build        # docker build
+make push         # push to Artifact Registry
+make sast         # run gosec
+make scan         # gosec + govulncheck
+make docs         # regenerate OpenAPI spec from annotations
+make health       # curl localhost:8080/health
 ```
 
-Run a single Go test:
-```bash
-go test -run TestFunctionName -v ./...
-go test -run TestFunctionName -v ./internal/config/...
-```
+Go version: **1.25**. Use `nix-shell -p go_1_25` when needing Go tooling locally.
 
-Terraform tests (OpenTofu, no GCP credentials needed):
-```bash
-tofu -chdir=terraform init -backend=false
-tofu -chdir=terraform validate
-tofu -chdir=terraform test
-```
+## CI
 
-## Before committing
+All PRs must pass these checks (see `.github/workflows/ci.yaml`):
 
-`go vet ./...` and `make test` must pass. CI runs: test, vet, gosec, govulncheck, trivy, gitleaks, build (statically linked), docs freshness, terraform validate+test.
+- **Test**: `go test -count=1 -coverprofile=coverage.out ./...`
+- **Vet**: `go vet ./...`
+- **SAST (gosec)**: `gosec -exclude G101,G304,G704,G705 ./...` (continue-on-error, uploads SARIF)
+- **Vulnerability Check**: `govulncheck ./...`
+- **Container Scan (trivy)**: filesystem scan
+- **Secret Scan**: gitleaks
+- **Build**: static binary, verifies `file` output contains "statically linked"
+- **Docs Freshness**: regenerates `docs/swagger.yaml` via `swag init` and diffs for drift
+
+Gosec rules G101, G304, G704, G705 are excluded as false positives for this codebase. The `@latest` version of gosec ignores `//nosec` annotations, so exclusions are via `-exclude` flag only.
+
+## Branch and merge rules
+
+- `main` is branch-protected: requires CI pass, linear history, squash merge
+- All changes via PRs. No direct pushes to `main`.
+- Single squashed commit per PR. Use `git commit --amend --no-edit && git push --force` for changes on feature branches.
+- No approval required (set to 0). `--admin` flag available if needed.
+- Always `git checkout main && git pull origin main && git reset --hard origin/main` before creating new branches.
 
 ## Architecture
 
-Single-binary Go proxy on Cloud Run. All code lives under `internal/`:
+```
+main.go                          # entry point, wiring
+internal/
+  auth/auth.go                   # JWT/API key authentication, domain checks
+  circuitbreaker/circuitbreaker.go # three-state circuit breaker for Vertex AI
+  config/config.go               # env var loading
+  handler/
+    handler.go                   # Server, Routes, middleware, checkPolicy, CORS
+    mode.go                      # logAction, writeJSON, parseBody, webhook notify
+    vertex.go                    # Vertex AI native format passthrough
+    openai.go                    # OpenAI Chat Completions handler
+    anthropic.go                  # Anthropic Messages API handler
+  inspector/
+    inspector.go                 # Chain, concurrent screening, BlockResult
+    regex.go                     # regex patterns (SSN, CC, keys, credentials)
+    modelarmor.go                # Model Armor standalone API
+    dlp.go                       # Cloud DLP content:inspect
+  metrics/metrics.go             # Prometheus counters and histograms
+  policy/engine.go               # OPA policy engine (rego package, hot-reload)
+  ratelimit/ratelimit.go         # fixed-window per-email rate limiter
+  streaming/streaming.go         # SSE helpers for Anthropic/OpenAI formats
+  translate/translate.go         # format translation between API formats
+  vertex/client.go               # Vertex AI HTTP client (with circuit breaker)
+  vertex/demo.go                 # DemoClient (canned responses)
+  webhook/webhook.go             # async block event notifications (retry with backoff)
+```
 
-- `config/` — env var loading
-- `auth/` — JWT extraction, domain allowlist, API key validation
-- `inspector/` — `Inspector` interface + chain (`regex.go`, `modelarmor.go`, `dlp.go`). Chain runs concurrently, stops on first block. Fail-open on errors.
-- `handler/` — HTTP routes for Anthropic (`/v1/messages`), OpenAI (`/v1/chat/completions`), Vertex AI passthrough
-- `translate/` — API format translation (Anthropic/OpenAI <-> Gemini)
-- `vertex/` — Vertex AI HTTP client
-- `streaming/` — SSE formatting
-- `policy/` — Embedded OPA engine (off by default)
-- `metrics/` — Prometheus counters
+## Key design decisions
 
-`main.go` is ~109 lines: loads config, wires inspectors into handler, starts HTTP server.
+- **Cloud-agnostic**: standard library where possible, zero vendor lock-in
+- **Modular inspector architecture**: `Inspector` interface with pluggable backends
+- **Fail-open on inspector errors**: network failures in Model Armor/DLP do not block traffic. Logged at ERROR level. Alert on `bulwarkai_inspector_results_total{result="error"}`.
+- **Fail-open on policy errors**: OPA evaluation errors allow the request through.
+- **User tokens all the way through**: `X-Forwarded-Access-Token` forwarded to Vertex AI for audit identity
+- **Request pipeline order**: auth, then rate limit, then OPA policy, then inspector chain, then Vertex AI
+- **OPA hot-reload**: file polled every 5s, HTTP URL every 30s. Bad recompilations preserve old policy.
+- **No org-specific values in git**: project names, domains, emails only in `.env`
+- **No SVGs**: all icons must be PNGs
+- **Brand**: Bulwarkai (not BulwarkAI)
+- **No em dashes** in prose
+
+## Environment variables
+
+See `.env.example` for the full list. Key ones:
+
+| Variable | Purpose |
+|---|---|
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID |
+| `ALLOWED_DOMAINS` | comma-separated email domain allowlist |
+| `RESPONSE_MODE` | `strict`, `fast`, or `audit` |
+| `OPA_ENABLED` | `true` to enable OPA policy engine |
+| `OPA_POLICY_FILE` | path to Rego file (hot-reloaded every 5s) |
+| `OPA_POLICY_URL` | HTTP URL or inline Rego (URL polled every 30s) |
+| `RATE_LIMIT` | per-email request limit per window (0 = disabled) |
+| `WEBHOOK_URL` | URL for block event notifications |
+| `LOCAL_MODE` | `true` to skip auth (dev only) |
+| `DEMO_MODE` | `true` for canned responses, no Vertex AI calls |
+
+## Writing style
+
+- Follow the `avoid-ai-tropes` skill: no em dashes, no "delve/leverage/robust/landscape", no bold-first bullets, no tricolon escalation, no negative parallelism
+- **NO EM DASHES AT ALL** in any file
+- No comments in Go code unless explicitly asked
 
 ## Code style
 
-- No inline comments. Names must be self-documenting. Package docs go in `doc.go`.
-- Inject `*http.Client` for all outbound HTTP. Tests mock with `httptest.NewServer`.
-- Fail-open on inspector errors (return nil, log WARN).
-- Tests must not make real network calls.
+- `CGO_ENABLED=0` static binary, `scratch` Docker image
+- `slog` for structured JSON logging
+- Prometheus metrics via `promauto`
+- OpenAPI spec generated from code annotations via `swaggo/swag`
+- `handler.NewServer(cfg, chain, caller, httpClient, policyEngine, webhookNotifier, rateLimiter)` (7 args, order matters)
+- `policy.Engine.Evaluate()` returns `*Decision` only (errors handled internally, fail-open)
+- `policy.NewEngineWithHTTP(ctx, enabled, policyFile, policyURL, httpClient)` is the full constructor. `NewEngine` wraps it with `nil` httpClient.
+- Circuit breaker wraps Vertex AI client calls (5 failures / 30s timeout, hardcoded). Open state returns 503.
+- Webhook notifier retries failed deliveries with exponential backoff (up to 3 attempts).
+- CORS middleware enabled via `CORS_ORIGIN` env var.
+- No vendor-specific SDKs in the hot path. The Vertex AI client uses plain `net/http`.
 
 ## Terraform
 
-Flat config in `terraform/` (not a module). Key conditionals:
+Located in `terraform/`. Region: `europe-west2`. All resources EU-only due to org policy.
 
-- `dlp_enabled` — gates DLP IAM binding and Cloud Run env vars
-- `vpc_sc_enabled` — gates VPC-SC perimeter, access level, org data source
-- `api_keys` — gates secret version creation
-- `user_agent_regex` — gates Cloud Run env var
-- `allowed_iam_members` — gates invoker IAM bindings (count-based)
+Key resources:
+- `cloud_run.tf`: Cloud Run v2 service with Direct VPC Egress, CMEK, Binary Authorization
+- `opa_policy.tf`: GCS config bucket for OPA policy storage
+- `monitoring.tf`: alert policies (inspector fail-open, high deny rate, latency) + dashboard
+- `model_armor.tf`: Model Armor template with `ignore_partial_invocation_failures = false`
+- `vpc_sc.tf`: VPC Service Controls perimeter
 
-`access_policy_name` and `org_id` have empty-string defaults so `tofu validate` works without VPC-SC. `terraform.tfvars` is gitignored; use `terraform.tfvars.example` as template.
+Cloud Build is blocked (creates US resources). Use local `docker build` + push to Artifact Registry.
 
-Tests live in `terraform/tests/*.tftest.hcl` using `mock_provider "google"` — no credentials required.
+## Docs
 
-## Gotchas
+- `docs/` is the source of truth
+- `scripts/sync-docs.sh` generates `site/content/docs/` from `docs/` with Zola front matter
+- Site uses Zola 0.22.1, syntax highlighting `github-dark`
+- Design: warm parchment cream (`#F5F0E8`), gold accents (`#C9A84C`), castle/medieval theme
+- Hero strapline: "Your AI castle has no moat."
 
-- Swagger (`docs/swagger.yaml`) is generated from handler annotations. If you change handler signatures, run `make docs` or CI will fail on docs freshness.
-- Go module is `github.com/Daviey/bulwarkai` (note capital D).
-- Docker image is `scratch` — no OS packages, no shell. Binary only + TLS certs.
-- `DEMO_MODE=true` returns canned responses for zero-cost testing (no Vertex AI calls).
-- `LOCAL_MODE=true` skips auth, uses ADC. For local dev only.
-- Region defaults to `europe-west2`. Cloud Build is not used because it creates US resources regardless of config.
-- `shell.nix` provides all dev tools (Go, tofu, swag, gosec, etc.).
+## Known issues
+
+- Model Armor does NOT enforce on streaming endpoints (`streamGenerateContent`). Google is aware.
+- Model Armor does NOT work with third-party models (Anthropic, Llama). This is why Bulwarkai exists.
+- `gosec @latest` installs a dev version that ignores `//nosec` annotations. Workaround: `-exclude` flag.
+- Cloud Build blocked by EU-only org policy.
+- OPA hot-reload file tests can flake under `go test ./...` due to CPU contention with parallel test packages. They pass reliably when run individually (`go test ./internal/policy/`).
