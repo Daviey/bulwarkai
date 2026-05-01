@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Daviey/bulwarkai/internal/config"
@@ -175,4 +176,40 @@ func TestClient_BuildVertexURL(t *testing.T) {
 func TestDemoClient_ImplementsInterface(t *testing.T) {
 	var _ VertexCaller = (*DemoClient)(nil)
 	var _ VertexCaller = (*Client)(nil)
+}
+
+func TestVertexError_Error(t *testing.T) {
+	ve := newVertexError(429, "quota exceeded")
+	if ve.Error() != "vertex returned 429: quota exceeded" {
+		t.Fatalf("got %q", ve.Error())
+	}
+	if ve.StatusCode != 429 {
+		t.Fatalf("got %d", ve.StatusCode)
+	}
+}
+
+func TestVertexError_TruncatesBody(t *testing.T) {
+	longBody := strings.Repeat("x", 1000)
+	ve := newVertexError(500, longBody)
+	if len(ve.Body) != 500 {
+		t.Fatalf("expected 500 chars, got %d", len(ve.Body))
+	}
+}
+
+func TestShouldTripBreaker(t *testing.T) {
+	if !shouldTripBreaker(newVertexError(500, "internal")) {
+		t.Error("500 should trip breaker")
+	}
+	if !shouldTripBreaker(newVertexError(0, "network")) {
+		t.Error("network error (0) should trip breaker")
+	}
+	if shouldTripBreaker(newVertexError(400, "bad request")) {
+		t.Error("400 should not trip breaker")
+	}
+	if shouldTripBreaker(newVertexError(401, "unauthorized")) {
+		t.Error("401 should not trip breaker")
+	}
+	if shouldTripBreaker(newVertexError(429, "quota")) {
+		t.Error("429 should not trip breaker")
+	}
 }

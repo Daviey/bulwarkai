@@ -179,9 +179,9 @@ The Vertex AI client wraps all outbound calls in a circuit breaker. When `CB_MAX
 
 After `CB_RESET_TIMEOUT` (default 30 seconds) in the open state, the breaker transitions to half-open and allows a single probe request. A successful probe closes the circuit. A failed probe reopens it.
 
-The breaker state is exposed in the `/health` endpoint (`circuit_breaker` field) and as the `bulwarkai_circuit_breaker_state` Prometheus gauge. The state values are: 1 (closed), 0.5 (half-open), 0 (open).
+The breaker state is exposed in the `/health` endpoint (`circuit_breaker` field with `state` and `failures`) and as the `bulwarkai_circuit_breaker_state` Prometheus gauge. The state values are: 1 (closed), 0.5 (half-open), 0 (open).
 
-## CORS
+The breaker only trips on server errors (5xx) and network failures. Client errors (4xx, including 429 quota exceeded and 401 unauthorized) do not count toward the failure threshold. This prevents a burst of auth failures or quota rejections from opening the circuit.
 
 ## CORS
 

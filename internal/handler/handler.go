@@ -174,14 +174,16 @@ func (s *Server) checkPolicy(w http.ResponseWriter, r *http.Request, identity *a
 // @Success 200 {object} map[string]string
 // @Router /health [get]
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
-	resp := map[string]string{
+	resp := map[string]interface{}{
 		"status":  "ok",
 		"mode":    s.cfg.ResponseMode,
 		"version": s.cfg.Version,
 	}
 	if s.policy != nil {
-		resp["opa"] = "enabled"
-		resp["opa_status"] = s.policy.Status()
+		resp["opa"] = map[string]string{
+			"status": "enabled",
+			"info":   s.policy.Status(),
+		}
 	}
 	if s.webhook != nil {
 		resp["webhook"] = "enabled"
@@ -190,7 +192,7 @@ func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 		resp["rate_limit"] = "enabled"
 	}
 	if vc, ok := s.vertex.(*vertex.Client); ok && vc != nil {
-		resp["circuit_breaker"] = vc.BreakerState()
+		resp["circuit_breaker"] = vc.BreakerInfo()
 	}
 	writeJSON(w, resp)
 }
