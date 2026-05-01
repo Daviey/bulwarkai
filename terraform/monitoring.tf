@@ -58,7 +58,7 @@ resource "google_monitoring_alert_policy" "high_latency" {
 
       aggregations {
         alignment_period   = "300s"
-        per_series_aligner = "ALIGN_PERCENTILE"
+        per_series_aligner = "ALIGN_PERCENTILE_99"
         group_by_fields   = []
       }
     }

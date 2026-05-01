@@ -15,10 +15,10 @@ resource "google_storage_bucket" "config" {
   uniform_bucket_level_access = true
 
   encryption {
-    default_kms_key_name = google_kms_crypto_key.artifact.id
+    default_kms_key_name = google_kms_crypto_key.artifact_registry.id
   }
 
-  depends_on = [google_project_service.storage]
+  depends_on = [google_project_service.secretmanager]
 }
 
 resource "google_storage_bucket_iam_member" "config_reader" {
