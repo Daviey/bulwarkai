@@ -9,10 +9,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Daviey/bulwarkai/internal/circuitbreaker"
 	"github.com/Daviey/bulwarkai/internal/config"
+	"github.com/Daviey/bulwarkai/internal/tracing"
 
 	"golang.org/x/oauth2/google"
 )
@@ -133,6 +135,10 @@ func (c *Client) CallStreamRaw(ctx context.Context, body map[string]interface{},
 }
 
 func (c *Client) callStreamRaw(ctx context.Context, body map[string]interface{}, accessToken, model, action string) (io.ReadCloser, error) {
+	ctx, span := tracing.StartSpan(ctx, "vertex.callStreamRaw")
+	span.SetAttribute("model", model)
+	span.SetAttribute("action", action)
+	defer span.End()
 	url := fmt.Sprintf("%s/publishers/google/models/%s:%s", c.cfg.VertexBase, model, action)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -173,6 +179,9 @@ func (c *Client) CallJSONForModel(ctx context.Context, body map[string]interface
 }
 
 func (c *Client) callJSONForModel(ctx context.Context, body map[string]interface{}, accessToken, model string, streaming bool) ([]byte, error) {
+	ctx, span := tracing.StartSpan(ctx, "vertex.callJSONForModel")
+	span.SetAttribute("model", model)
+	defer span.End()
 	url := fmt.Sprintf("%s/publishers/google/models/%s:generateContent", c.cfg.VertexBase, model)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -210,6 +219,9 @@ func (c *Client) CallJSON(ctx context.Context, body map[string]interface{}, acce
 }
 
 func (c *Client) callJSON(ctx context.Context, body map[string]interface{}, accessToken string, streaming bool) ([]byte, error) {
+	ctx, span := tracing.StartSpan(ctx, "vertex.callJSON")
+	span.SetAttribute("streaming", strconv.FormatBool(streaming))
+	defer span.End()
 	url := c.buildVertexURL(streaming)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
@@ -255,6 +267,9 @@ func shouldTripBreaker(err error) bool {
 }
 
 func (c *Client) callStream(ctx context.Context, body map[string]interface{}, accessToken string) (io.ReadCloser, error) {
+	ctx, span := tracing.StartSpan(ctx, "vertex.callStream")
+	span.SetAttribute("streaming", "true")
+	defer span.End()
 	url := c.buildVertexURL(true)
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))

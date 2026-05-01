@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/Daviey/bulwarkai/internal/inspector"
 	"github.com/Daviey/bulwarkai/internal/metrics"
 	"github.com/Daviey/bulwarkai/internal/policy"
+	"github.com/Daviey/bulwarkai/internal/tracing"
 	"github.com/Daviey/bulwarkai/internal/vertex"
 	"github.com/Daviey/bulwarkai/internal/webhook"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -126,23 +128,33 @@ func (s *Server) requestMiddleware(next http.Handler) http.Handler {
 		if idx := strings.Index(traceID, "/"); idx > 0 {
 			traceID = traceID[:idx]
 		}
+		if traceID == "" {
+			traceID = uuid.New().String()[:32]
+		}
 		email := extractEmailFromRequest(r)
 		ctx := context.WithValue(r.Context(), requestIDKey, reqID)
-		logger := slog.With("request_id", reqID, "method", r.Method, "path", r.URL.Path, "email", email)
-		if traceID != "" {
-			logger = logger.With("trace_id", traceID)
+		ctx = tracing.ContextWithTraceID(ctx, traceID)
+		ctx, span := tracing.StartSpan(ctx, "http.request")
+		span.SetAttribute("http.method", r.Method)
+		span.SetAttribute("http.path", r.URL.Path)
+		if email != "" {
+			span.SetAttribute("email", email)
 		}
+		defer span.End()
+		logger := slog.With("request_id", reqID, "method", r.Method, "path", r.URL.Path, "email", email, "trace_id", traceID)
 		ctx = context.WithValue(ctx, contextKey("logger"), logger)
 		sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		w.Header().Set("X-Bulwarkai", s.cfg.Version)
 		w.Header().Set("X-Request-ID", reqID)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Trace-ID", traceID)
 		metrics.ActiveRequests.Inc()
 		defer metrics.ActiveRequests.Dec()
 		if r.ContentLength > 0 {
 			metrics.RequestBodySize.Observe(float64(r.ContentLength))
 		}
 		next.ServeHTTP(sw, r.WithContext(ctx))
+		span.SetAttribute("http.status_code", strconv.Itoa(sw.status))
 		duration := time.Since(start).Seconds()
 		metrics.RequestDuration.WithLabelValues("request").Observe(duration)
 		logger.Info("request completed", "status", sw.status, "duration_ms", time.Since(start).Milliseconds(), "user_agent", r.UserAgent())
