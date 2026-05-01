@@ -171,7 +171,7 @@ When `WEBHOOK_URL` is set, every BLOCK and DENY event triggers an asynchronous H
 
 Notifications are sent from a buffered queue (256 events). If the queue is full, events are dropped and a warning is logged. This prevents webhook backpressure from affecting request processing latency.
 
-The webhook client sets a `Content-Type: application/json` header and optionally an `X-Webhook-Secret` header (when `WEBHOOK_SECRET` is configured). The client has a 10-second timeout per request. Non-2xx responses are logged as warnings but do not trigger retries.
+The webhook client sets a `Content-Type: application/json` header and optionally an `X-Webhook-Secret` header (when `WEBHOOK_SECRET` is configured). The client has a 10-second timeout per request. Server errors (5xx) and network errors trigger up to 3 retries with exponential backoff (500ms base, 2x factor, 10s cap). Client errors (4xx) are not retried.
 
 ## Request Flow
 

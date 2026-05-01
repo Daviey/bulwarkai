@@ -36,6 +36,7 @@ type Config struct {
 	RateLimitWindow     string
 	WebhookURL          string
 	WebhookSecret       string
+	CORSOrigin          string
 }
 
 func Load() *Config {
@@ -64,6 +65,7 @@ func Load() *Config {
 		RateLimitWindow:     EnvOr("RATE_LIMIT_WINDOW", "1m"),
 		WebhookURL:          EnvOr("WEBHOOK_URL", ""),
 		WebhookSecret:       EnvOr("WEBHOOK_SECRET", ""),
+		CORSOrigin:          EnvOr("CORS_ORIGIN", ""),
 	}
 	c.ModelArmorEndpoint = "https://modelarmor." + c.ModelArmorLocation + ".rep.googleapis.com"
 	if ua := os.Getenv("USER_AGENT_REGEX"); ua != "" {

@@ -467,3 +467,58 @@ func TestRequestMiddleware_LogsEmail(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }
+
+func TestCORSMiddleware_WithOrigin(t *testing.T) {
+	cfg := testConfig()
+	cfg.CORSOrigin = "https://bulwarkai.cloud"
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, nil)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("OPTIONS", "/health", nil)
+	r.Header.Set("Origin", "https://bulwarkai.cloud")
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 for OPTIONS, got %d", w.Code)
+	}
+	if w.Header().Get("Access-Control-Allow-Origin") != "https://bulwarkai.cloud" {
+		t.Errorf("expected CORS origin header, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+	if w.Header().Get("Access-Control-Allow-Methods") == "" {
+		t.Error("expected Allow-Methods header")
+	}
+}
+
+func TestCORSMiddleware_NoOrigin(t *testing.T) {
+	cfg := testConfig()
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, nil)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Errorf("expected no CORS header when CORS_ORIGIN empty, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestCORSMiddleware_PassThrough(t *testing.T) {
+	cfg := testConfig()
+	cfg.CORSOrigin = "https://bulwarkai.cloud"
+	chain := inspector.NewChain()
+	srv := NewServer(cfg, chain, nil, http.DefaultClient, nil, nil, nil)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	r.Header.Set("Origin", "https://bulwarkai.cloud")
+	srv.Routes().ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if w.Header().Get("Access-Control-Allow-Origin") != "https://bulwarkai.cloud" {
+		t.Errorf("expected CORS origin on GET too, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+}

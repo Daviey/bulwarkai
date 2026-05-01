@@ -71,7 +71,24 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/projects/", s.ServeVertexProject)
 	mux.HandleFunc("/v1/projects/", s.ServeVertexProject)
 	mux.Handle("/metrics", promhttp.Handler())
-	return s.rateLimitMiddleware(s.requestMiddleware(mux))
+	return s.corsMiddleware(s.rateLimitMiddleware(s.requestMiddleware(mux)))
+}
+
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
+	origin := s.cfg.CORSOrigin
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Api-Key, X-Forwarded-Access-Token, X-Request-ID")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) rateLimitMiddleware(next http.Handler) http.Handler {
@@ -143,7 +160,7 @@ func (s *Server) checkPolicy(w http.ResponseWriter, r *http.Request, identity *a
 		Path:   r.URL.Path,
 	})
 	if !dec.Allowed {
-		s.logAction("DENY_POLICY", model, "", dec.Reason, identity.Email)
+		s.logCtx(r.Context(), "DENY_POLICY", model, "", dec.Reason, identity.Email)
 		http.Error(w, dec.Reason, http.StatusForbidden)
 		return false
 	}

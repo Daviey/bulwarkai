@@ -12,16 +12,25 @@ import (
 	"github.com/Daviey/bulwarkai/internal/webhook"
 )
 
+func reqIDFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(requestIDKey).(string)
+	return id
+}
+
 func (s *Server) auditResponse(ctx context.Context, text, token, model, email string) {
 	if text == "" {
 		return
 	}
 	if br := s.chain.ScreenResponse(ctx, text, token); br != nil {
-		s.logAction("BLOCK_RESPONSE_AUDIT", model, "", br.Reason, email)
+		s.logAction("BLOCK_RESPONSE_AUDIT", model, "", br.Reason, email, reqIDFromContext(ctx))
 	}
 }
 
-func (s *Server) logAction(action, model, prompt, reason, email string) {
+func (s *Server) logCtx(ctx context.Context, action, model, prompt, reason, email string) {
+	s.logAction(action, model, prompt, reason, email, reqIDFromContext(ctx))
+}
+
+func (s *Server) logAction(action, model, prompt, reason, email, requestID string) {
 	metrics.RequestsTotal.WithLabelValues(action, model).Inc()
 	prompt = s.cfg.RedactPrompt(prompt)
 	level := slog.LevelInfo
@@ -29,11 +38,12 @@ func (s *Server) logAction(action, model, prompt, reason, email string) {
 		level = slog.LevelWarn
 		if s.webhook != nil {
 			s.webhook.Notify(webhook.BlockEvent{
-				Action: action,
-				Model:  model,
-				Email:  email,
-				Reason: reason,
-				Prompt: prompt,
+				Action:    action,
+				Model:     model,
+				Email:     email,
+				Reason:    reason,
+				Prompt:    prompt,
+				RequestID: requestID,
 			})
 		}
 	}
@@ -43,6 +53,7 @@ func (s *Server) logAction(action, model, prompt, reason, email string) {
 		slog.String("email", email),
 		slog.String("reason", reason),
 		slog.String("prompt", prompt),
+		slog.String("request_id", requestID),
 	)
 }
 
