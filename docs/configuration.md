@@ -81,7 +81,7 @@ Rate limiting is per email address. Requests that exceed the limit receive HTTP 
 | `WEBHOOK_URL` | string | none | URL to send HTTP POST notifications for BLOCK and DENY events. When set, every block event triggers an async JSON payload to this URL. Leave empty to disable webhook notifications. |
 | `WEBHOOK_SECRET` | string | none | Secret token sent in the `X-Webhook-Secret` header with each notification. Use this to verify that payloads come from Bulwarkai. |
 
-The webhook payload is a JSON object with fields: `timestamp`, `action`, `model`, `email`, `reason`, `request_id`, `prompt`. Notifications are sent asynchronously from a buffered queue (256 events). If the queue is full, events are dropped and a warning is logged. The webhook client has a 10-second timeout per request. Non-2xx responses are logged as warnings.
+The webhook payload is a JSON object with fields: `timestamp`, `action`, `model`, `email`, `reason`, `request_id`, `prompt`. Notifications are sent asynchronously from a buffered queue (256 events). If the queue is full, events are dropped and a warning is logged. The webhook client has a 10-second timeout per request. Server errors (5xx) and network errors trigger up to 3 retries with exponential backoff (500ms base, 2x factor, 10s cap). Client errors (4xx) are not retried.
 
 ## Authentication
 
@@ -89,6 +89,14 @@ The webhook payload is a JSON object with fields: `timestamp`, `action`, `model`
 |---|---|---|---|
 | `API_KEYS` | comma-separated string | none | Static API keys accepted via the `X-Api-Key` header. When set, requests can authenticate with either a valid API key or a JWT bearer token. Leave empty to require JWT bearer tokens only. |
 | `USER_AGENT_REGEX` | string (Go regex) | none | Go regex pattern for User-Agent header enforcement. Requests with a non-matching User-Agent are rejected with a `DENY_UA` log action. Leave empty to disable User-Agent checking. Example: `^opencode/.*$` |
+
+## CORS
+
+| Variable | Type | Default | Description |
+|---|---|---|---|
+| `CORS_ORIGIN` | string | none | Value for the `Access-Control-Allow-Origin` response header. When set, the service responds to OPTIONS preflight requests and adds CORS headers to all responses. Leave empty to disable CORS headers. Example: `https://bulwarkai.cloud` |
+
+When enabled, the service handles OPTIONS requests with a 204 No Content response and sets `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, and `Access-Control-Max-Age` headers.
 
 ## Server
 

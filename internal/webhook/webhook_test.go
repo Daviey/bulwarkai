@@ -129,3 +129,80 @@ func TestNotifier_StopsDraining(t *testing.T) {
 		t.Errorf("expected 3 events after stop, got %d", received.Load())
 	}
 }
+
+func TestNotifier_RetryOnServerError(t *testing.T) {
+	var attempts atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count := attempts.Add(1)
+		if count < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	n := NewNotifier(ts.URL, "", 16)
+	n.Start()
+	defer n.Stop()
+
+	n.Notify(BlockEvent{Action: "BLOCK_PROMPT"})
+
+	deadline := time.After(10 * time.Second)
+	for attempts.Load() < 3 {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out, got %d attempts", attempts.Load())
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+}
+
+func TestNotifier_RetryExhausted(t *testing.T) {
+	var attempts atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	n := NewNotifier(ts.URL, "", 16)
+	n.Start()
+	defer n.Stop()
+
+	n.Notify(BlockEvent{Action: "BLOCK_PROMPT"})
+
+	deadline := time.After(15 * time.Second)
+	for attempts.Load() < 4 {
+		select {
+		case <-deadline:
+			t.Fatalf("timed out, got %d attempts", attempts.Load())
+		default:
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+	if attempts.Load() != 4 {
+		t.Errorf("expected 4 attempts (1 + 3 retries), got %d", attempts.Load())
+	}
+}
+
+func TestNotifier_NoRetryOnClientError(t *testing.T) {
+	var attempts atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer ts.Close()
+
+	n := NewNotifier(ts.URL, "", 16)
+	n.Start()
+	defer n.Stop()
+
+	n.Notify(BlockEvent{Action: "BLOCK_PROMPT"})
+
+	time.Sleep(500 * time.Millisecond)
+	if attempts.Load() != 1 {
+		t.Errorf("expected 1 attempt for 4xx, got %d", attempts.Load())
+	}
+}

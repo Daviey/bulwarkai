@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -19,6 +20,13 @@ type BlockEvent struct {
 	RequestID string `json:"request_id"`
 	Prompt    string `json:"prompt,omitempty"`
 }
+
+const (
+	maxRetries    = 3
+	baseBackoff   = 500 * time.Millisecond
+	maxBackoff    = 10 * time.Second
+	backoffFactor = 2.0
+)
 
 type Notifier struct {
 	url    string
@@ -72,22 +80,40 @@ func (n *Notifier) processQueue() {
 			for {
 				select {
 				case evt := <-n.queue:
-					n.send(evt)
+					n.sendWithRetry(evt)
 				default:
 					return
 				}
 			}
 		case evt := <-n.queue:
-			n.send(evt)
+			n.sendWithRetry(evt)
 		}
 	}
 }
 
-func (n *Notifier) send(evt BlockEvent) {
+func (n *Notifier) sendWithRetry(evt BlockEvent) {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := time.Duration(math.Min(float64(baseBackoff)*math.Pow(backoffFactor, float64(attempt-1)), float64(maxBackoff)))
+			slog.Info("webhook retry", "action", evt.Action, "attempt", attempt, "backoff_ms", backoff.Milliseconds())
+			select {
+			case <-n.done:
+				return
+			case <-time.After(backoff):
+			}
+		}
+		if n.send(evt) {
+			return
+		}
+	}
+	slog.Error("webhook exhausted retries", "action", evt.Action, "email", evt.Email, "url", n.url)
+}
+
+func (n *Notifier) send(evt BlockEvent) bool {
 	payload, err := json.Marshal(evt)
 	if err != nil {
 		slog.Error("webhook marshal error", "error", err)
-		return
+		return true
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -96,7 +122,7 @@ func (n *Notifier) send(evt BlockEvent) {
 	req, err := http.NewRequestWithContext(ctx, "POST", n.url, bytes.NewReader(payload))
 	if err != nil {
 		slog.Error("webhook request create error", "error", err)
-		return
+		return true
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "bulwarkai-webhook/1.0")
@@ -106,14 +132,21 @@ func (n *Notifier) send(evt BlockEvent) {
 
 	resp, err := n.client.Do(req)
 	if err != nil {
-		slog.Error("webhook send error", "url", n.url, "error", err)
-		return
+		slog.Warn("webhook send error", "url", n.url, "error", err)
+		return false
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode >= 300 {
-		slog.Warn("webhook non-success response", "url", n.url, "status", resp.StatusCode)
-	} else {
-		slog.Debug("webhook sent", "action", evt.Action, "email", evt.Email, "status", resp.StatusCode)
+	if resp.StatusCode >= 500 {
+		slog.Warn("webhook server error", "url", n.url, "status", resp.StatusCode)
+		return false
 	}
+
+	if resp.StatusCode >= 300 {
+		slog.Warn("webhook client error, not retrying", "url", n.url, "status", resp.StatusCode)
+		return true
+	}
+
+	slog.Debug("webhook sent", "action", evt.Action, "email", evt.Email, "status", resp.StatusCode)
+	return true
 }

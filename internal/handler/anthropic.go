@@ -51,7 +51,7 @@ func (s *Server) ServeAnthropic(w http.ResponseWriter, r *http.Request) {
 
 	br := s.chain.ScreenPrompt(r.Context(), prompt, identity.AccessToken)
 	if br != nil {
-		s.logAction("BLOCK_PROMPT", model, prompt, br.Reason, identity.Email)
+		s.logCtx(r.Context(), "BLOCK_PROMPT", model, prompt, br.Reason, identity.Email)
 		writeAnthropicError(w, br.Reason)
 		return
 	}
@@ -82,7 +82,7 @@ func (s *Server) handleAnthropicStrict(w http.ResponseWriter, r *http.Request, g
 	}
 
 	if pf, ok := vertexResp["promptFeedback"].(map[string]interface{}); ok && pf["blockReason"] != nil {
-		s.logAction("MODEL_ARMOR_BLOCK", model, prompt, translate.StrVal(pf["blockReasonMessage"], ""), identity.Email)
+		s.logCtx(r.Context(), "MODEL_ARMOR_BLOCK", model, prompt, translate.StrVal(pf["blockReasonMessage"], ""), identity.Email)
 		writeAnthropicError(w, "Model Armor: "+translate.StrVal(pf["blockReasonMessage"], ""))
 		return
 	}
@@ -90,13 +90,13 @@ func (s *Server) handleAnthropicStrict(w http.ResponseWriter, r *http.Request, g
 	responseText := translate.ExtractGeminiText(vertexResp)
 	if responseText != "" {
 		if verdict := s.chain.ScreenResponse(r.Context(), responseText, identity.AccessToken); verdict != nil {
-			s.logAction("BLOCK_RESPONSE", model, "", verdict.Reason, identity.Email)
+			s.logCtx(r.Context(), "BLOCK_RESPONSE", model, "", verdict.Reason, identity.Email)
 			writeAnthropicError(w, verdict.Reason)
 			return
 		}
 	}
 
-	s.logAction("ALLOW", model, prompt, "", identity.Email)
+	s.logCtx(r.Context(), "ALLOW", model, prompt, "", identity.Email)
 	msg := translate.TranslateGeminiToAnthropic(vertexResp, model)
 
 	if stream {
@@ -117,7 +117,7 @@ func (s *Server) handleAnthropicFast(w http.ResponseWriter, r *http.Request, gem
 			return
 		}
 		defer rc.Close()
-		s.logAction("ALLOW_FAST", model, prompt, "", identity.Email)
+		s.logCtx(r.Context(), "ALLOW_FAST", model, prompt, "", identity.Email)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -133,7 +133,7 @@ func (s *Server) handleAnthropicFast(w http.ResponseWriter, r *http.Request, gem
 			writeAnthropicError(w, "vertex response decode error")
 			return
 		}
-		s.logAction("ALLOW_FAST", model, prompt, "", identity.Email)
+		s.logCtx(r.Context(), "ALLOW_FAST", model, prompt, "", identity.Email)
 		writeJSON(w, translate.TranslateGeminiToAnthropic(vertexResp, model))
 	}
 }
@@ -147,7 +147,7 @@ func (s *Server) handleAnthropicAudit(w http.ResponseWriter, r *http.Request, ge
 			return
 		}
 		defer rc.Close()
-		s.logAction("ALLOW_AUDIT", model, prompt, "", identity.Email)
+		s.logCtx(r.Context(), "ALLOW_AUDIT", model, prompt, "", identity.Email)
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
@@ -164,7 +164,7 @@ func (s *Server) handleAnthropicAudit(w http.ResponseWriter, r *http.Request, ge
 			return
 		}
 		accumulated = translate.ExtractGeminiText(vertexResp)
-		s.logAction("ALLOW_AUDIT", model, prompt, "", identity.Email)
+		s.logCtx(r.Context(), "ALLOW_AUDIT", model, prompt, "", identity.Email)
 		writeJSON(w, translate.TranslateGeminiToAnthropic(vertexResp, model))
 	}
 	s.auditResponse(r.Context(), accumulated, identity.AccessToken, model, identity.Email)
