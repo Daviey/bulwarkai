@@ -12,6 +12,7 @@ import (
 	"github.com/Daviey/bulwarkai/internal/config"
 	"github.com/Daviey/bulwarkai/internal/inspector"
 	"github.com/Daviey/bulwarkai/internal/policy"
+	"github.com/Daviey/bulwarkai/internal/tracing"
 	"github.com/Daviey/bulwarkai/internal/vertex"
 	"github.com/Daviey/bulwarkai/internal/webhook"
 )
@@ -540,5 +541,55 @@ func TestCORSMiddleware_PassThrough(t *testing.T) {
 	}
 	if w.Header().Get("Access-Control-Allow-Origin") != "https://bulwarkai.cloud" {
 		t.Errorf("expected CORS origin on GET too, got %q", w.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestRequestMiddleware_TraceIDPropagated(t *testing.T) {
+	srv := testServer(testConfig(), vertex.NewDemoClient(testConfig()))
+	handler := srv.Routes()
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	r.Header.Set("X-Cloud-Trace-Context", "abc123def456/1234")
+	handler.ServeHTTP(w, r)
+
+	if w.Header().Get("X-Trace-ID") != "abc123def456" {
+		t.Fatalf("expected X-Trace-ID abc123def456, got %q", w.Header().Get("X-Trace-ID"))
+	}
+}
+
+func TestRequestMiddleware_TraceIDGenerated(t *testing.T) {
+	srv := testServer(testConfig(), vertex.NewDemoClient(testConfig()))
+	handler := srv.Routes()
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/health", nil)
+	handler.ServeHTTP(w, r)
+
+	traceID := w.Header().Get("X-Trace-ID")
+	if traceID == "" {
+		t.Fatal("expected X-Trace-ID to be generated")
+	}
+	if len(traceID) != 32 {
+		t.Fatalf("expected 32-char trace ID, got %d chars", len(traceID))
+	}
+}
+
+func TestRequestMiddleware_SpanCreated(t *testing.T) {
+	ctx := context.Background()
+	ctx = tracing.ContextWithTraceID(ctx, "test-trace-123")
+	ctx, span := tracing.StartSpan(ctx, "http.request")
+	span.SetAttribute("http.method", "GET")
+	span.SetAttribute("http.path", "/health")
+	span.End()
+
+	if span.TraceID != "test-trace-123" {
+		t.Fatalf("expected trace ID test-trace-123, got %q", span.TraceID)
+	}
+	if span.Attributes["http.method"] != "GET" {
+		t.Fatalf("expected http.method GET, got %q", span.Attributes["http.method"])
+	}
+	if span.SpanID == "" {
+		t.Fatal("expected span ID")
 	}
 }
