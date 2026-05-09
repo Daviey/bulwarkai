@@ -81,8 +81,13 @@ func TestReadiness_NoVertex(t *testing.T) {
 	r := httptest.NewRequest("GET", "/ready", nil)
 	srv.readinessHandler(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("got %d", w.Code)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d", w.Code)
+	}
+	var body map[string]string
+	json.NewDecoder(w.Body).Decode(&body)
+	if body["status"] != "not ready" {
+		t.Fatalf("expected status 'not ready', got %q", body["status"])
 	}
 }
 

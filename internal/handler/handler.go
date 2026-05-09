@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -222,8 +223,9 @@ func (s *Server) readinessHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.vertex == nil {
-		writeJSON(w, map[string]string{"status": "not ready", "reason": "vertex client not initialised"})
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"status": "not ready", "reason": "vertex client not initialised"})
 		return
 	}
 	writeJSON(w, map[string]string{"status": "ready", "mode": s.cfg.ResponseMode, "version": s.cfg.Version})
