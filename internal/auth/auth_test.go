@@ -210,6 +210,30 @@ func TestAuthenticate_NoDomainRestriction(t *testing.T) {
 	}
 }
 
+func TestAuthenticate_EmailWithNoAtSign(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"email": "notanemail"})
+	}))
+	defer ts.Close()
+
+	cfg := &config.Config{
+		AllowedDomains: []string{"example.com"},
+		TokenInfoURL:   ts.URL,
+	}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/v1/messages", nil)
+	r.Header.Set("Authorization", "Bearer test-token")
+
+	_, ok := Authenticate(cfg, ts.Client(), w, r)
+	if ok {
+		t.Fatal("expected rejection for email without @")
+	}
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("got %d", w.Code)
+	}
+}
+
 func TestExtractEmailFromJWT(t *testing.T) {
 	tests := []struct {
 		name  string

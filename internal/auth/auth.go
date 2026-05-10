@@ -58,8 +58,12 @@ func Authenticate(cfg *config.Config, httpClient *http.Client, w http.ResponseWr
 
 	if len(cfg.AllowedDomains) > 0 {
 		parts := strings.SplitN(email, "@", 2)
-		if len(parts) != 2 || !config.Contains(cfg.AllowedDomains, parts[1]) {
-			slog.Warn("DENY_DOMAIN", "action", "DENY_DOMAIN", "email", email, "domain", parts[1])
+		domain := "unknown"
+		if len(parts) == 2 {
+			domain = parts[1]
+		}
+		if len(parts) != 2 || !config.Contains(cfg.AllowedDomains, domain) {
+			slog.Warn("DENY_DOMAIN", "action", "DENY_DOMAIN", "email", email, "domain", domain)
 			http.Error(w, "domain not allowed", http.StatusForbidden)
 			return nil, false
 		}
