@@ -60,6 +60,7 @@ internal/
     vertex.go                    # Vertex AI native format passthrough
     openai.go                    # OpenAI Chat Completions handler
     anthropic.go                  # Anthropic Messages API handler
+    models.go                    # OpenAI-compatible /v1/models endpoint
   inspector/
     inspector.go                 # Chain, concurrent screening, BlockResult
     regex.go                     # regex patterns (SSN, CC, keys, credentials)
@@ -69,6 +70,7 @@ internal/
   policy/engine.go               # OPA policy engine (rego package, hot-reload)
   ratelimit/ratelimit.go         # fixed-window per-email rate limiter
   streaming/streaming.go         # SSE helpers for Anthropic/OpenAI formats
+  tracing/tracing.go             # lightweight span-based tracing
   translate/translate.go         # format translation between API formats
   vertex/client.go               # Vertex AI HTTP client (with circuit breaker)
   vertex/demo.go                 # DemoClient (canned responses)
